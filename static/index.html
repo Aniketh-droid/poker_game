@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bayesian Poker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="top-nav">
+        <button class="nav-btn active" id="nav-play" onclick="switchTab('play')">Play Table</button>
+        <button class="nav-btn" id="nav-arena" onclick="switchTab('arena')">Simulation Arena</button>
+    </div>
+
+    <!-- PLAY TAB -->
+    <div id="tab-play" class="tab-content active">
+        <div class="overlay" id="start-overlay">
+            <div class="start-modal">
+                <h1>Bayesian Poker</h1>
+                <p>Select your opponent</p>
+                <div class="opponent-options">
+                    <button onclick="startGame('RANDOM')">Random</button>
+                    <button onclick="startGame('EV')">Expected Value</button>
+                    <button onclick="startGame('BAYESIAN')" class="primary-btn">Bayesian</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <!-- Opponent Area -->
+            <div class="player-area opponent">
+                <div class="player-info">
+                    <h2 id="villain-name">Opponent</h2>
+                    <div class="stack" id="villain-stack">$0.00</div>
+                </div>
+                <div class="cards-container" id="villain-cards"></div>
+            </div>
+
+            <!-- Pot and Board -->
+            <div class="center-area">
+                <div class="pot-display">
+                    POT: <span id="pot-amount" class="glow-text">$0.00</span>
+                </div>
+                <div class="board-container" id="board-cards"></div>
+            </div>
+
+            <!-- Hero Area -->
+            <div class="player-area hero">
+                <div class="cards-container" id="hero-cards"></div>
+                <div class="player-info">
+                    <h2>You</h2>
+                    <div class="stack" id="hero-stack">$0.00</div>
+                </div>
+                
+                <div class="action-panel" id="action-panel"></div>
+            </div>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div class="overlay hidden" id="game-over-overlay">
+            <div class="game-over-modal">
+                <h1 id="outcome-title">Hand Over</h1>
+                <p id="outcome-details"></p>
+                
+                <div class="thoughts-panel">
+                    <h3>Opponent's Logic <span class="reveal-badge">Revealed</span></h3>
+                    <div id="thoughts-list" class="thoughts-scroller"></div>
+                </div>
+
+                <button onclick="location.reload()" class="primary-btn mt-4">Next Hand</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ARENA TAB -->
+    <div id="tab-arena" class="tab-content hidden">
+        <div class="arena-container">
+            <div class="arena-header">
+                <h1>⚡ Data Arena</h1>
+                <p>Run automated high-speed matchups and visualize performance.</p>
+            </div>
+            
+            <div class="arena-card">
+                <div class="arena-controls">
+                    <div class="input-group">
+                        <label>⚔️ Select Matchup</label>
+                        <select id="sim-matchup">
+                            <option value="bayesian_vs_ev">🧠 Bayesian vs 📉 Pure EV</option>
+                            <option value="bayesian_vs_random">🧠 Bayesian vs 🎲 Random</option>
+                            <option value="ev_vs_random">📉 EV vs 🎲 Random</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>🔄 Hand Volume</label>
+                        <input type="number" id="sim-hands" value="200" min="10" max="1000">
+                    </div>
+                    <button class="primary-btn glow-btn" id="btn-simulate" onclick="runSimulation()">Run Simulation</button>
+                </div>
+                
+                <div id="sim-loading" class="hidden">
+                    <div class="spinner"></div>
+                    <p class="pulsing-text">Crunching numbers...</p>
+                </div>
+
+                <div id="sim-results" class="hidden">
+                    <div class="stats-grid">
+                        <div class="stat-box primary-box">
+                            <span class="stat-label">🏆 Ultimate Winner</span>
+                            <span class="stat-value" id="res-winner">-</span>
+                        </div>
+                        <div class="stat-box stat-accent">
+                            <span class="stat-label">📈 Win Rate</span>
+                            <span class="stat-value highlight" id="res-winrate">-</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">🤝 Tie / Split Rate</span>
+                            <span class="stat-value" id="res-tierate">-</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">⏱️ Elapsed Time</span>
+                            <span class="stat-value" id="res-time">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="macos-window">
+                        <div class="macos-header">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                            <div class="macos-title">Simulation_Results.png</div>
+                        </div>
+                        <div class="plot-container">
+                            <img id="res-plot" src="" alt="Simulation Result Plots">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+:root {
+    --bg-dark: #09090b;
+    --panel-dark: rgba(24, 24, 27, 0.7);
+    --panel-solid: #18181b;
+    --accent: #3b82f6; 
+    --action-call: #10b981;
+    --action-fold: #ef4444;
+    --action-bet: #f59e0b;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, var(--bg-dark) 70%);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tabs */
+.top-nav {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: transparent;
+    z-index: 10;
+}
+.nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    transition: all 0.2s;
+}
+.nav-btn:hover { color: var(--text-primary); background: transparent; }
+.nav-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
+.tab-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    width: 100%;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+.tab-content.hidden { 
+    display: none; 
+    opacity: 0; 
+}
+
+/* Modals */
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    transition: opacity 0.3s ease;
+}
+
+.overlay.hidden { opacity: 0; pointer-events: none; }
+
+.start-modal, .game-over-modal {
+    background: var(--panel-solid);
+    padding: 3rem;
+    border-radius: 1.5rem;
+    text-align: center;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 25px 40px -10px rgba(0,0,0,0.8), 0 0 0 1px inset rgba(255,255,255,0.05);
+    max-width: 600px;
+    width: 90%;
+}
+.game-over-modal {
+    padding: 2rem;
+}
+
+.start-modal h1 { color: var(--text-primary); margin-bottom: 0.5rem; font-size: 2rem; font-weight: 800; }
+.start-modal p { color: var(--text-muted); margin-bottom: 2rem; }
+
+.opponent-options { display: flex; flex-direction: column; gap: 0.75rem; }
+
+button {
+    font-family: inherit; font-weight: 500; font-size: 0.95rem;
+    padding: 0.85rem 1.5rem; border-radius: 0.75rem;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border-subtle);
+    color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;
+}
+button:hover { background: rgba(255,255,255,0.1); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+button.primary-btn {
+    background: var(--accent); color: white; border: none;
+    box-shadow: 0 4px 14px 0 rgba(59,130,246,0.39);
+}
+button.primary-btn:hover:not(:disabled) { background: #2563eb; transform: translateY(-1px); }
+.mt-4 { margin-top: 1.5rem; }
+
+/* Thoughts Panel */
+.thoughts-panel {
+    margin-top: 1.5rem;
+    text-align: left;
+    background: #09090b;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.75rem;
+    padding: 1rem;
+}
+.thoughts-panel h3 {
+    font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;
+}
+.reveal-badge {
+    background: rgba(16, 185, 129, 0.15); color: #10b981;
+    padding: 0.15rem 0.5rem; border-radius: 1rem; font-size: 0.7rem;
+}
+.thoughts-scroller {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: #cbd5e1;
+}
+.thought-item {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 0.5rem;
+    border-left: 2px solid var(--accent);
+}
+
+/* Arena Styles */
+.arena-container {
+    width: 100%; max-width: 900px; height: 100%;
+    padding: 2rem; display: flex; flex-direction: column; gap: 2rem;
+    overflow-y: auto;
+}
+.arena-header h1 { font-size: 2rem; font-weight: 800; color: var(--text-primary); }
+.arena-header p { color: var(--text-muted); }
+
+.arena-card {
+    background: var(--panel-solid); padding: 2rem; border-radius: 1.5rem;
+    border: 1px solid var(--border-subtle); box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+}
+.arena-controls {
+    display: flex; gap: 1.5rem; align-items: flex-end; margin-bottom: 2rem; flex-wrap: wrap;
+}
+.input-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 200px;}
+.input-group label { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;}
+.input-group select, .input-group input {
+    background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-subtle);
+    padding: 0.75rem 1rem; border-radius: 0.5rem; font-family: inherit; font-size: 1rem;
+}
+
+.spinner {
+    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+    border-top: 3px solid var(--accent); border-radius: 50%;
+    animation: spin 1s linear infinite; margin: 0 auto 1rem auto;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+#sim-loading { text-align: center; color: var(--text-muted); padding: 3rem 0; }
+
+.stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;
+}
+.stat-box {
+    background: var(--bg-dark); padding: 1.25rem; border-radius: 0.75rem; border: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 0.25rem;
+}
+.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
+.stat-value.highlight { color: var(--action-call); }
+
+.plot-container {
+    width: 100%; border-radius: 1rem; overflow: hidden; border: 1px solid var(--border-subtle);
+}
+.plot-container img { width: 100%; display: block; object-fit: contain; background: #fff;}
+
+/* Game Table Layout (Kept from previous) */
+.main-container {
+    width: 100%; max-width: 1100px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 3rem;
+}
+.player-area { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.player-info { text-align: center; background: var(--panel-solid); border: 1px solid var(--border-subtle); padding: 0.5rem 1.5rem; border-radius: 1rem; }
+.player-info h2 { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;}
+.stack { font-size: 1.2rem; font-weight: 600; color: var(--text-primary); }
+.center-area { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+.pot-display { background: var(--panel-dark); padding: 0.75rem 2rem; border-radius: 2rem; font-size: 1.1rem; font-weight: 600; color: var(--text-muted); border: 1px solid var(--border-subtle);}
+.glow-text { color: var(--text-primary); font-weight: 700; margin-left: 0.5rem; }
+.cards-container, .board-container { display: flex; gap: 10px; min-height: 120px; justify-content: center; }
+.card { width: 80px; height: 115px; background: #fff; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; font-size: 1.1rem; font-weight: 700; color: #000; box-shadow: 0 4px 10px rgba(0,0,0,0.3); position: relative; animation: slideUp 0.3s ease forwards; }
+.card.red { color: #ef4444; }
+.card.black { color: #0f172a; }
+.card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.2rem; opacity: 0.15; }
+.card-back { background: #1e293b; border: none; background-image: linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,0.03) 25%, transparent 25%); background-size: 10px 10px; }
+.action-panel { display: flex; gap: 1rem; background: var(--panel-dark); border: 1px solid var(--border-subtle); border-radius: 1.2rem; padding: 0.75rem; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.action-panel.active { opacity: 1; pointer-events: auto; }
+.action-btn { font-size: 0.9rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; text-transform: capitalize; border: none; }
+.btn-fold { color: var(--action-fold); background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); }
+.btn-check-call { color: var(--action-call); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); }
+.btn-bet { color: var(--action-bet); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); }
+
+/* Spice up Arena Styles */
+.glow-btn {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+}
+.glow-btn:hover {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.pulsing-text {
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0% { opacity: 0.5; text-shadow: 0 0 0 transparent;}
+    50% { opacity: 1; text-shadow: 0 0 10px var(--accent);}
+    100% { opacity: 0.5; text-shadow: 0 0 0 transparent;}
+}
+
+.primary-box {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.stat-accent {
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.macos-window {
+    background: #000; /* Window background */
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.macos-header {
+    background: #18181b; /* Header background matches panel*/
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+.macos-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    font-family: inherit;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.dot.red { background: #ff5f56; }
+.dot.yellow { background: #ffbd2e; }
+.dot.green { background: #27c93f; }
+
+/* Let Plot fill correctly but with dark mode inverted overlay maybe? Nah just white bg container */
+.macos-window .plot-container {
+    background: #fff; /* Graph background */
+    border: none;
+    border-radius: 0;
+}
