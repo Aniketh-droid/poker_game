@@ -76,11 +76,18 @@ def play_hand(
         legal = get_legal_actions(state, pid)
         if not legal:
             break
+        # Capture the street the action was actually taken on BEFORE
+        # apply_action(), since a CHECK/CALL that closes the street can
+        # itself advance state.street as a side effect. Without this,
+        # observers always see the (already-advanced) post-action street,
+        # or - as was previously the case - no street at all, silently
+        # defaulting to preflop for every belief update.
+        acted_street = state.street
         action = agents[pid].act(state)
         if action not in legal:
             action = legal[0]
         state.apply_action(action)
-        agents[1 - pid].observe(action)
+        agents[1 - pid].observe(action, street=acted_street)
 
         # Deal next board cards when street advanced
         if state.street == 1 and len(state.board) == 0:
