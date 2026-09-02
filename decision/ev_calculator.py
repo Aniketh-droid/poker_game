@@ -61,6 +61,7 @@ def compute_ev(
     hero_id: int = 0,
     samples: int = 200,
     rng: Any = None,
+    opponent_stats: Optional[Any] = None,
 ) -> float:
     """
     Compute EV for an action.
@@ -129,6 +130,15 @@ def compute_ev(
         from belief.opponent_model import get_fold_probability, get_call_probability
         fold_prob = get_fold_probability(belief, game_state)
         call_prob = get_call_probability(belief, game_state)
+        if opponent_stats is not None:
+            # Adaptive correction: shrink the static archetype prior toward
+            # this opponent's actual observed fold/call frequency at this
+            # street (see belief/opponent_stats.py). With no observations yet
+            # this is a no-op; it only matters once the match has accumulated
+            # real signal about an opponent the archetype table mismatches.
+            from belief.opponent_stats import blend_with_prior
+            empirical = opponent_stats.empirical_rates(game_state.street)
+            fold_prob, call_prob = blend_with_prior(fold_prob, call_prob, empirical)
 
     win_prob, tie_prob = _get_equity_cached(
         game_state=game_state, hero_cards=hero_cards, board=board,

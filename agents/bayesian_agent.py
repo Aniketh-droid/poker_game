@@ -23,6 +23,7 @@ from belief.hand_bucketing import (
 )
 from belief.bayesian_update import update_belief
 from belief.entropy import compute_entropy
+from belief.opponent_stats import OpponentStats
 
 PREFLOP_BUCKETS = [PREMIUM, STRONG, MEDIUM, SPECULATIVE, TRASH]
 POSTFLOP_BUCKETS = [STRONG_MADE, MEDIUM_MADE, WEAK_MADE, STRONG_DRAW, WEAK_DRAW, AIR]
@@ -109,6 +110,13 @@ class BayesianAgent(BaseAgent):
         self._hand_actions: List[str] = []
         self._last_street: int = 0
         self._transitioned_to_postflop: bool = False
+        # Empirical fold/call tracking for THIS opponent, accumulated across
+        # the whole match. Deliberately NOT touched by reset(): belief is a
+        # per-hand quantity (what are this opponent's hole cards right now?)
+        # but opponent_stats answers a cross-hand question (how does this
+        # opponent actually behave?) and needs many hands of signal to be
+        # useful -- see belief/opponent_stats.py.
+        self._opponent_stats = OpponentStats()
 
     def reset(self) -> None:
         self._belief = _uniform_prior(PREFLOP_BUCKETS)
@@ -133,6 +141,7 @@ class BayesianAgent(BaseAgent):
             ctx,
             opponent_type=self.opponent_type,
         )
+        self._opponent_stats.record(opponent_action, street)
 
         if self.forgetting_factor > 0:
             keys = list(self._belief.keys())
@@ -192,7 +201,7 @@ class BayesianAgent(BaseAgent):
         for action in legal:
             ev_dict[action] = compute_ev(
                 action, game_state, belief=self._belief, hero_id=self.player_id,
-                samples=self.samples, rng=self._rng,
+                samples=self.samples, rng=self._rng, opponent_stats=self._opponent_stats,
             )
 
         # Gate exploration on how confident we are about opponent's hand
