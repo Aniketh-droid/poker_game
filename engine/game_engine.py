@@ -2,6 +2,12 @@
 Game engine: play one hand between two agents, return chip delta.
 """
 
+# `from __future__ import annotations` keeps the `List[float] | Dict[str, Any]`
+# return annotation below lazily-evaluated as a string, so this module stays
+# importable on Python 3.8/3.9 (PEP 604 `X | Y` syntax at runtime requires 3.10+),
+# matching the "Python 3.8+" requirement stated in the README.
+from __future__ import annotations
+
 import random
 from typing import List, Optional, Any, Dict
 
