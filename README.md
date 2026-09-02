@@ -101,16 +101,28 @@ This is the easiest way to deploy the web UI to a host like Render, Fly.io, or R
 The system ships with several agents to evaluate performance against:
 *   **Random Agent**: Selects purely random actions. Used as an absolute baseline.
 *   **EV Agent**: Plays "ABC" poker. It calculates EV but assumes the opponent's hole cards are completely random. Mathematically sound, but heavily exploitable.
-*   **Bayesian Agent**: The star of the project. Dynamically updates its opponent ranges and uses precise EV calculations against a narrowed-down range to extract maximum value and make elite folds.
+*   **Bayesian Agent**: Dynamically updates its belief about the opponent's hand and runs EV calculations against a narrowed range instead of a uniform one. It convincingly outperforms the Random baseline, but **does not currently beat the EV agent head-to-head** - see Known Limitations below for why, with the measured root cause.
 
-**Sample Simulation Output (`main.py`):**
-When simulating the Bayesian Agent against the EV agent across 1,500 hands:
-*   `Mean chip gain: 4.4714 (95% CI [3.2955, 5.6473])`
-*   *Interpretation*: The 95% Confidence Interval is heavily above 0, statistically proving the Bayesian agent exhibits superior, non-random exploitation skills.
+**Real Simulation Output (`main.py --hands 1500 --samples 50`, 5 seeds, current code):**
 
-Note that this result is measured against EV/Random agents that the Bayesian agent's belief model is well-suited to exploit; it isn't a claim of solver-level (Nash-approximate) play. See Future Improvements below.
+| Matchup | Mean chip gain | Win rate | 95% CI |
+|---|---|---|---|
+| Bayesian vs EV | **-0.8410** | 46.01% | [-0.9287, -0.7534] |
+| Bayesian vs Random | +5.2501 | 55.35% | [4.8652, 5.6351] |
+| EV vs Random | +5.7302 | 62.33% | [5.1807, 6.2797] |
+
+So the actual ranking is **EV > Bayesian > Random**. The Bayesian agent's belief-tracking machinery clearly helps against Random (it beats it more convincingly than a naive baseline would), but it currently *loses* to the simpler EV agent by a statistically significant margin (the 95% CI for that matchup sits entirely below zero, and the effect is consistent across all 5 seeds individually). This is a genuine, reproducible result of the current implementation, not a stale or cherry-picked number - see below for the root cause.
 
 ---
+
+## ⚠️ Known Limitations
+
+The Bayesian agent losing to the simpler EV agent (above) was diagnosed down to two compounding, verified root causes in the current code:
+
+1.  **A real bug: `observe()` never receives the actual street.** `engine/game_engine.py` calls `agents[1 - pid].observe(action)` with no `street` argument, and `BayesianAgent.observe(self, opponent_action, street=0)` silently defaults to street `0` (preflop) for every call - so every postflop belief update is computed against the *preflop* row of the likelihood tables in `opponent_model.py`, regardless of what street the action actually happened on. Patching the engine to pass the real street through (`agents[1 - pid].observe(action, street=acted_street)`, captured *before* `apply_action()` since a check/call can itself advance the street) measurably narrows the gap in isolated testing (Bayesian vs EV mean chip gain improved from about -0.73 to about -0.52 at a smaller/faster benchmark scale) but does not fully close it.
+2.  **A deeper design limitation: the opponent archetype is a static, unlearned label.** `main.py` hard-codes `opponent_type="TIGHT"` when the Bayesian agent faces the EV agent. That label feeds fixed fold/call/bet-probability tables designed to describe a rule-based archetype (`TightAgent`-like behavior) - but `EVAgent` doesn't play like any hard-coded archetype; it best-responds to real Monte Carlo equity with no concept of hand buckets. Measuring `EVAgent`'s *actual* fold frequency by hand bucket and comparing it against the table the Bayesian agent assumes shows large, systematic gaps - for example, the model assumes a `TRASH`-bucket preflop opponent folds effectively 100% of the time under the TIGHT scaling, but `EVAgent` actually folds trash only about 12% of the time; the model assumes postflop `AIR` folds ~75-98% of the time, but `EVAgent` folds it under 10% of the time. Sweeping the opponent archetype (`TIGHT` / `LOOSE` / `AGGRESSIVE`) against the EV agent confirms this isn't a "wrong preset" problem: **none of the three static labels let the Bayesian agent beat the EV agent** - because the EV agent doesn't correspond to any fixed archetype at all. The `opponent_type` label never adapts to the opponent's actually-observed behavior during a match; only the hand-bucket belief does.
+
+Together, these mean the Bayesian agent's edge is currently real but narrower and more conditional than the "star of the project" framing implied: it reliably exploits agents whose behavior resembles its hard-coded archetypes (or is unconditionally weak, like Random), and currently *loses* to an opponent that plays sound EV-maximizing poker without matching any of those archetypes. Fixing item 1 is a small, low-risk patch; fixing item 2 properly is exactly the **Dynamic RL Opponent Modeling** item already listed below, and is the highest-leverage next step for this project.
 
 ## 🔮 Future Improvements
 
