@@ -2,8 +2,39 @@
 Run multi-seed experiments and print statistically meaningful summaries.
 """
 
+import argparse
 import time
 from evaluation.hand_evaluator import compare as compare_hands
+
+DEFAULT_HANDS = 1500
+DEFAULT_SAMPLES = 50
+DEFAULT_SEEDS = [12345, 23456, 34567, 45678, 56789]
+ALL_MATCHUPS = ("bayesian_vs_ev", "bayesian_vs_random", "ev_vs_random")
+
+
+def parse_args(argv=None) -> argparse.Namespace:
+    """CLI arguments for configuring experiment runs (instead of hardcoded constants)."""
+    parser = argparse.ArgumentParser(
+        description="Run multi-seed Bayesian Poker Agent experiments and print "
+        "statistically meaningful summaries (mean chip gain, win rate, 95% CI)."
+    )
+    parser.add_argument(
+        "--hands", type=int, default=DEFAULT_HANDS,
+        help=f"Number of hands per seed per matchup (default: {DEFAULT_HANDS}).",
+    )
+    parser.add_argument(
+        "--samples", type=int, default=DEFAULT_SAMPLES,
+        help=f"Monte Carlo samples per EV/equity estimate (default: {DEFAULT_SAMPLES}).",
+    )
+    parser.add_argument(
+        "--seeds", type=int, nargs="+", default=DEFAULT_SEEDS,
+        help=f"Random seeds, one run per seed (default: {DEFAULT_SEEDS}).",
+    )
+    parser.add_argument(
+        "--matchups", choices=ALL_MATCHUPS, nargs="+", default=list(ALL_MATCHUPS),
+        help="Which matchups to run (default: all three).",
+    )
+    return parser.parse_args(argv)
 
 
 class EvalWrapper:
@@ -124,39 +155,44 @@ def _run_pairing(name, agent1_factory, agent2_factory, hands, seeds, samples):
     }
 
 
-def main() -> None:
+def main(argv=None) -> None:
     from agents.bayesian_agent import BayesianAgent
     from agents.ev_agent import EVAgent
     from agents.random_agent import RandomAgent
 
-    hands = 500
-    samples = 25
-    seeds = [12345, 23456, 34567]
+    args = parse_args(argv)
+    hands = args.hands
+    samples = args.samples
+    seeds = args.seeds
+    matchups = set(args.matchups)
 
-    _run_pairing(
-        "Bayesian vs EV",
-        lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="TIGHT", forgetting_factor=0.01),
-        lambda s: EVAgent(player_id=1, epsilon=0.05, samples=samples, seed=s),
-        hands=hands,
-        seeds=seeds,
-        samples=samples,
-    )
-    _run_pairing(
-        "Bayesian vs Random",
-        lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="LOOSE", forgetting_factor=0.01),
-        lambda s: RandomAgent(player_id=1),
-        hands=hands,
-        seeds=seeds,
-        samples=samples,
-    )
-    _run_pairing(
-        "EV vs Random",
-        lambda s: EVAgent(player_id=0, epsilon=0.05, samples=samples, seed=s),
-        lambda s: RandomAgent(player_id=1),
-        hands=hands,
-        seeds=seeds,
-        samples=samples,
-    )
+    if "bayesian_vs_ev" in matchups:
+        _run_pairing(
+            "Bayesian vs EV",
+            lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="TIGHT", forgetting_factor=0.01),
+            lambda s: EVAgent(player_id=1, epsilon=0.05, samples=samples, seed=s),
+            hands=hands,
+            seeds=seeds,
+            samples=samples,
+        )
+    if "bayesian_vs_random" in matchups:
+        _run_pairing(
+            "Bayesian vs Random",
+            lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="LOOSE", forgetting_factor=0.01),
+            lambda s: RandomAgent(player_id=1),
+            hands=hands,
+            seeds=seeds,
+            samples=samples,
+        )
+    if "ev_vs_random" in matchups:
+        _run_pairing(
+            "EV vs Random",
+            lambda s: EVAgent(player_id=0, epsilon=0.05, samples=samples, seed=s),
+            lambda s: RandomAgent(player_id=1),
+            hands=hands,
+            seeds=seeds,
+            samples=samples,
+        )
 
 
 if __name__ == "__main__":
