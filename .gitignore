@@ -29,3 +29,8 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# Generated benchmark plots (regenerated on demand by main.py / the Simulation
+# Arena tab -- see experiments/visualize.py's os.makedirs(..., exist_ok=True)).
+# Not committing these keeps the repo from accumulating stale run artifacts.
+static/plots/*.png

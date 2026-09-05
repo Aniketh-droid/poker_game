@@ -1,5 +1,5 @@
 """
-Action space for heads-up No-Limit Texas Hold'em.
+Action space for N-handed (2-6 players) No-Limit Texas Hold'em.
 Bet sizes: 25%, 50%, 100% pot, or all-in. Max 2 raises per street.
 """
 
@@ -25,6 +25,8 @@ def get_legal_actions(game_state: Any, player_id: int) -> List[str]:
     """
     Return list of legal actions for the current player.
     Enforces raise cap (max 2 raises per street), stack limits, and prevents illegal check/call.
+    Generalized to N players: "the opponent's bet" becomes "the largest bet among live
+    (non-folded) players" -- at num_players == 2 this is identical to the old behavior.
     """
     if hasattr(game_state, "_update_to_call"):
         game_state._update_to_call()
@@ -34,8 +36,11 @@ def get_legal_actions(game_state: Any, player_id: int) -> List[str]:
     last_bet_size = game_state.last_bet_size
     street_bets = getattr(game_state, "street_bets", [0.0, 0.0])
     my_bet_this_street = street_bets[player_id]
-    opp_bet_this_street = street_bets[1 - player_id]
-    to_call = opp_bet_this_street - my_bet_this_street
+
+    live_players = game_state.live_players() if hasattr(game_state, "live_players") else \
+        [i for i in range(len(street_bets)) if i != getattr(game_state, "folded", None)]
+    max_bet_this_street = max((street_bets[i] for i in live_players), default=my_bet_this_street)
+    to_call = max_bet_this_street - my_bet_this_street
     if to_call < 0:
         to_call = 0.0
 

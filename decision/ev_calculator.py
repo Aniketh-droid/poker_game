@@ -10,10 +10,10 @@ which can cause it to fold when it shouldn't. Correct formula is:
 where cost is only the current action's cost.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from engine.action_space import get_legal_actions, FOLD, CHECK, CALL, BET_25, BET_50, BET_100, ALL_IN
-from evaluation.monte_carlo import estimate_equity
+from evaluation.monte_carlo import estimate_equity, estimate_equity_multiway
 
 
 def _belief_cache_key(belief: Optional[Dict[str, float]]) -> Optional[tuple]:
@@ -149,3 +149,122 @@ def compute_ev(
     ev_if_fold = pot          # opponent folds, we win the pot
     ev_if_call = equity * final_pot - cost  # FIX: removed - amount_invested
     return fold_prob * ev_if_fold + call_prob * ev_if_call
+
+
+def _opp_belief_cache_key(opp_belief_list: List[Optional[Dict[str, float]]]) -> tuple:
+    return tuple(_belief_cache_key(b) for b in opp_belief_list)
+
+
+def _get_equity_multiway_cached(
+    game_state: Any,
+    hero_cards: list,
+    board: list,
+    opp_belief_list: List[Optional[Dict[str, float]]],
+    samples: int,
+    rng: Any,
+    hero_id: int,
+) -> tuple:
+    # Mirrors _get_equity_cached above: equity doesn't depend on which action
+    # we're evaluating, only on hero cards/board/opponent beliefs, so without
+    # this cache compute_ev_multiway's per-action call sites (CHECK/CALL/every
+    # bet size) were each re-running a fresh samples=200-per-opponent Monte
+    # Carlo -- 5-7x the necessary work per decision point, which is what made
+    # multiway BayesianAgent decisions take 1-3+ seconds each at a 5-6 handed
+    # table. One estimate per decision, reused across every candidate action.
+    cache = getattr(game_state, "_equity_cache_multiway", None)
+    if cache is None:
+        cache = {}
+        setattr(game_state, "_equity_cache_multiway", cache)
+
+    key = (hero_id, tuple(hero_cards), tuple(board), _opp_belief_cache_key(opp_belief_list), samples)
+    if key not in cache:
+        cache[key] = estimate_equity_multiway(
+            hero_cards, board, opp_belief_list, samples=samples, rng=rng,
+        )
+    return cache[key]
+
+
+def compute_ev_multiway(
+    action: str,
+    game_state: Any,
+    hero_id: int,
+    opponent_beliefs: Optional[Dict[int, Optional[Dict[str, float]]]] = None,
+    opponent_fold_probs: Optional[Dict[int, float]] = None,
+    samples: int = 200,
+    rng: Any = None,
+) -> float:
+    """
+    EV for `action` at an N-handed table (2 to 6 players), used by any agent seated
+    where more than one opponent may still be live. Reuses the same fold/call
+    structure as compute_ev() above but generalized:
+
+    - equity is estimated multiway (hero vs every currently-live opponent at once)
+      via evaluation.monte_carlo.estimate_equity_multiway, keyed by each live
+      opponent's own belief (opponent_beliefs[seat], or None for a
+      non-belief-tracking opponent -- sampled uniformly).
+    - a bet/raise's "does everyone fold" probability is the PRODUCT of each live
+      opponent's individual fold probability (opponent_fold_probs[seat], default
+      0.2 per opponent if not supplied). This is a deliberate simplification, not
+      a full N-player game-theoretic solve (real multiway solves need CFR-style
+      search over every opponent's response, not just "fold or not") -- but it's
+      the right tradeoff for a real-time, fun-first game bot: it captures the
+      intuitive shape (more live opponents -> harder to bluff everyone off a
+      hand -> lower fold equity) without needing a full solver in the hot path.
+    """
+    pid = hero_id
+    stacks = game_state.stacks
+    pot = game_state.pot
+    live = [i for i in game_state.live_players() if i != pid] if hasattr(game_state, "live_players") \
+        else [i for i in range(len(stacks)) if i != pid]
+    street_bets = getattr(game_state, "street_bets", [0.0] * len(stacks))
+    max_bet = max((street_bets[i] for i in live + [pid]), default=street_bets[pid])
+    to_call = max(0.0, max_bet - street_bets[pid])
+    my_stack = stacks[pid]
+
+    if action == FOLD:
+        return 0.0
+
+    hero_cards = game_state.private_cards.get(pid, [])
+    board = getattr(game_state, "board", [])
+    beliefs = opponent_beliefs or {}
+    opp_belief_list = [beliefs.get(i) for i in live]
+
+    def _equity() -> float:
+        win_prob, tie_prob = _get_equity_multiway_cached(
+            game_state=game_state, hero_cards=hero_cards, board=board,
+            opp_belief_list=opp_belief_list, samples=samples, rng=rng, hero_id=pid,
+        )
+        return win_prob + tie_prob * 0.5
+
+    if action == CHECK:
+        return _equity() * pot - 0.0
+
+    if action == CALL:
+        cost = min(my_stack, to_call)
+        final_pot = pot + cost
+        return _equity() * final_pot - cost
+
+    # Bet/raise
+    pot_after_call = pot + to_call if to_call > 0 else pot
+    if action == BET_25:
+        bet_size = max(0.5, round(pot_after_call * 0.25, 2))
+    elif action == BET_50:
+        bet_size = max(0.5, round(pot_after_call * 0.5, 2))
+    elif action == BET_100:
+        bet_size = max(0.5, round(pot_after_call * 1.0, 2))
+    else:  # ALL_IN
+        bet_size = my_stack
+    bet_size = min(bet_size, my_stack)
+    cost = bet_size
+    final_pot = pot + to_call + bet_size
+
+    fold_probs = opponent_fold_probs or {}
+    fold_prob_all = 1.0
+    for i in live:
+        fold_prob_all *= fold_probs.get(i, 0.2)
+    call_prob_any = 1.0 - fold_prob_all
+
+    equity = _equity()
+    ev_if_all_fold = pot
+    ev_if_someone_continues = equity * final_pot - cost
+    return fold_prob_all * ev_if_all_fold + call_prob_any * ev_if_someone_continues

@@ -66,6 +66,7 @@ def play_hand(
         terminal_flag=False,
         street_bets=[sb, bb],
         folded=None,
+        total_contributed=[sb, bb],
     )
 
     agents = [agent1, agent2]
@@ -87,7 +88,7 @@ def play_hand(
         if action not in legal:
             action = legal[0]
         state.apply_action(action)
-        agents[1 - pid].observe(action, street=acted_street)
+        agents[1 - pid].observe(action, street=acted_street, actor_id=pid)
 
         # Deal next board cards when street advanced
         if state.street == 1 and len(state.board) == 0:
@@ -97,11 +98,12 @@ def play_hand(
         elif state.street == 3 and len(state.board) == 4:
             state.board.extend(deck.deal(1))
 
-    if state.folded is not None:
-        winner = 1 - state.folded
-        state.stacks[winner] += state.pot
+    if len(state.folded) > 0:
+        deltas = state.resolve_showdown(evaluator)
+        state.stacks[0] += deltas[0]
+        state.stacks[1] += deltas[1]
         outcome = "fold"
-        winner_id = winner
+        winner_id = 0 if deltas[0] > 0 else 1
     elif evaluator is not None and state.street > 3:
         deltas = state.resolve_showdown(evaluator)
         state.stacks[0] += deltas[0]
@@ -140,3 +142,156 @@ def play_hand(
         "betting_history": list(state.betting_history),
         "actions_by_player": actions_by_player,
     }
+
+
+def play_hand_multiway(
+    agents: List[Any],
+    seed: Optional[int] = None,
+    evaluator: Optional[Any] = None,
+    button: int = 0,
+    stacks: Optional[List[float]] = None,
+    return_details: bool = False,
+) -> Dict[str, Any]:
+    """
+    Play one hand at an N-handed table (3 to 6 players; also works at N=2, where it
+    reduces to the same blind/action-order rules as play_hand() above).
+
+    `agents` is the seat order (agents[i] sits in seat i); `button` is which seat has
+    the dealer button THIS hand -- callers rotate it between hands, e.g.
+    `button = (button + 1) % len(agents)`. Everything else (side pots, all-in run-outs,
+    multi-way showdowns) is handled by the now-N-general engine.game_state.GameState.
+
+    Returns a details dict (chip_delta, outcome, winner ids, board, per-seat actions)
+    -- always the detailed form, since a fun multiplayer table always wants to show
+    "who won what" rather than just a chip-delta list.
+    """
+    n = len(agents)
+    if n < 2:
+        raise ValueError("play_hand_multiway needs at least 2 agents")
+
+    rng = random.Random(seed)
+    deck = Deck(rng=rng).build().shuffle()
+    private_cards = {i: deck.deal(2) for i in range(n)}
+
+    base_stack = 50.0 * BB
+    seat_stacks = list(stacks) if stacks is not None else [base_stack] * n
+    initial_stacks = list(seat_stacks)
+
+    sb_amt, bb_amt = 0.5 * BB, BB
+    if n == 2:
+        sb_pos, bb_pos = button % n, (button + 1) % n
+    else:
+        sb_pos, bb_pos = (button + 1) % n, (button + 2) % n
+
+    street_bets = [0.0] * n
+    total_contributed = [0.0] * n
+    folded_out = set()
+
+    def _post(pid: int, amount: float) -> None:
+        amount = min(amount, seat_stacks[pid])
+        seat_stacks[pid] -= amount
+        street_bets[pid] += amount
+        total_contributed[pid] += amount
+        if seat_stacks[pid] <= 0:
+            pass  # all_in set is derived by GameState itself once constructed
+
+    # A player who sits down with 0 chips can't post -- treat them as already folded
+    # for this hand rather than crashing (defensive; the web UI should never let this
+    # happen, but a bot that busts mid-session shouldn't take the engine down).
+    for i in range(n):
+        if seat_stacks[i] <= 0:
+            folded_out.add(i)
+
+    _post(sb_pos, sb_amt)
+    _post(bb_pos, bb_amt)
+    pot = sum(street_bets)
+
+    first_actor = (bb_pos + 1) % n
+
+    state = GameState(
+        stacks=seat_stacks,
+        pot=pot,
+        street=0,
+        board=[],
+        private_cards=private_cards,
+        current_player=first_actor,
+        betting_history=[],
+        raises_this_street=0,
+        last_bet_size=bb_amt,
+        terminal_flag=False,
+        street_bets=street_bets,
+        folded=folded_out,
+        all_in=set(),
+        button=button,
+        total_contributed=total_contributed,
+    )
+    # If the freshly-posted blinds already put someone all-in, GameState needs to
+    # know before the first legal-action check.
+    for i in range(n):
+        if state.stacks[i] <= 1e-9 and i not in state.folded:
+            state.all_in.add(i)
+    state._update_to_call()
+
+    guard = 0
+    guard_limit = 2000  # generous upper bound on individual actions in one hand
+    while not state.is_terminal() and guard < guard_limit:
+        guard += 1
+        pid = state.current_player
+        legal = get_legal_actions(state, pid)
+        if not legal:
+            # Nobody left who can act (e.g. everyone remaining is all-in) --
+            # GameState's own street-closing logic should have already run the
+            # hand out to terminal; this is just a defensive stop.
+            break
+        acted_street = state.street
+        action = agents[pid].act(state)
+        if action not in legal:
+            action = legal[0]
+        state.apply_action(action)
+        for j in range(n):
+            if j != pid:
+                agents[j].observe(action, street=acted_street, actor_id=pid)
+
+        if state.street == 1 and len(state.board) == 0:
+            state.board.extend(deck.deal(3))
+        elif state.street == 2 and len(state.board) == 3:
+            state.board.extend(deck.deal(1))
+        elif state.street == 3 and len(state.board) == 4:
+            state.board.extend(deck.deal(1))
+
+    deltas = state.resolve_showdown(evaluator)
+    for i in range(n):
+        state.stacks[i] += deltas[i]
+
+    live = state.live_players()
+    if len(live) == 1:
+        outcome = "fold"
+        winner_ids = live
+    else:
+        best = max(deltas[i] for i in live)
+        winner_ids = [i for i in live if abs(deltas[i] - best) < 1e-9 and best > 0]
+        outcome = "showdown" if state.street > 3 else "fold"
+        if len(winner_ids) > 1:
+            outcome = "tie"
+
+    chip_delta = [state.stacks[i] - initial_stacks[i] for i in range(n)]
+
+    actions_by_player: Dict[int, List[str]] = {i: [] for i in range(n)}
+    for entry in state.betting_history:
+        pid = entry.get("player_id")
+        if pid in actions_by_player:
+            actions_by_player[pid].append(entry.get("action"))
+
+    result = {
+        "chip_delta": chip_delta,
+        "outcome": outcome,
+        "winner_ids": winner_ids,
+        "board": list(state.board),
+        "private_cards": dict(state.private_cards),
+        "betting_history": list(state.betting_history),
+        "actions_by_player": actions_by_player,
+        "button": button,
+        "num_players": n,
+        "folded_ids": sorted(state.folded),
+    }
+    return result

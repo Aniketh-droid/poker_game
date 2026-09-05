@@ -19,7 +19,7 @@ class _RecordingAgent(BaseAgent):
     def act(self, game_state):
         return self._inner.act(game_state)
 
-    def observe(self, opponent_action: str, street: int = 0) -> None:
+    def observe(self, opponent_action: str, street: int = 0, actor_id: int = None) -> None:
         self.observed.append((opponent_action, street))
 
 
