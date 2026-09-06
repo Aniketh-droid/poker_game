@@ -10,13 +10,8 @@
 
 <nav class="topnav">
   <div class="brand"><span class="chip-icon"></span> Bluff &amp; Bayes</div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" id="nav-play" onclick="switchTab('play')">Play</button>
-    <button class="nav-tab" id="nav-arena" onclick="switchTab('arena')">Simulation Arena</button>
-  </div>
 </nav>
 
-<!-- ============== PLAY TAB ============== -->
 <div class="page" id="tab-play">
 
   <!-- Setup screen -->
@@ -97,46 +92,6 @@
     </div>
   </div>
 
-</div>
-
-<!-- ============== SIMULATION ARENA TAB (secondary / academic mode) ============== -->
-<div class="page hidden" id="tab-arena">
-  <div class="setup-hero">
-    <h1>Simulation Arena</h1>
-    <p>The original head-to-head benchmark: run thousands of hands between the core decision models and compare results.</p>
-  </div>
-
-  <div class="arena-card">
-    <div class="arena-row">
-      <div class="field-group">
-        <label>Matchup</label>
-        <select id="sim-matchup">
-          <option value="bayesian_vs_ev">Bayesian vs EV</option>
-          <option value="bayesian_vs_random">Bayesian vs Random</option>
-          <option value="ev_vs_random">EV vs Random</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label>Hands</label>
-        <input type="number" id="sim-hands" value="300" min="10" max="5000">
-      </div>
-      <button class="btn-primary" id="btn-simulate" onclick="runSimulation()">Run Simulation</button>
-    </div>
-
-    <div id="sim-loading" class="hidden"><span class="loading-spinner"></span>Running simulation&hellip;</div>
-
-    <div id="sim-results" class="hidden">
-      <div class="arena-results">
-        <div class="stat-tile"><div class="st-label">Favored Agent</div><div class="st-value" id="res-winner">&mdash;</div></div>
-        <div class="stat-tile"><div class="st-label">Win Rate</div><div class="st-value" id="res-winrate">&mdash;</div></div>
-        <div class="stat-tile"><div class="st-label">Tie Rate</div><div class="st-value" id="res-tierate">&mdash;</div></div>
-        <div class="stat-tile"><div class="st-label">Elapsed</div><div class="st-value" id="res-time">&mdash;</div></div>
-      </div>
-      <img id="res-plot" class="arena-plot hidden" src="" alt="Simulation results plot">
-    </div>
-  </div>
-
-  <p class="footer-note">This arena runs the original 2-player benchmark models used to validate the Bayesian agent's design &mdash; separate from the multiway bot roster in Play mode.</p>
 </div>
 
 <script src="/app.js"></script>

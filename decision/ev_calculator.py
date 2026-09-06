@@ -109,6 +109,22 @@ def compute_ev(
         equity = win_prob + tie_prob * 0.5
         return equity * final_pot - cost  # FIX: removed - amount_invested
 
+    if action == ALL_IN and to_call > 0 and my_stack <= to_call:
+        # All-in for LESS than the amount needed to call: this is a capped call,
+        # not a bet/raise -- hero isn't asking anyone to fold, just putting in
+        # whatever's left. Route it through the CALL formula (cost = the whole
+        # stack, not to_call + bet_size, which would double-count and wildly
+        # overstate the pot) rather than the bet/raise branch below, which
+        # assumes bet_size is calling PLUS an additional raise on top.
+        cost = my_stack
+        final_pot = pot + cost
+        win_prob, tie_prob = _get_equity_cached(
+            game_state=game_state, hero_cards=hero_cards, board=board,
+            belief=belief, samples=samples, rng=rng, hero_id=pid,
+        )
+        equity = win_prob + tie_prob * 0.5
+        return equity * final_pot - cost
+
     # Bet/raise actions
     pot_after_call = pot + to_call if to_call > 0 else pot
     if action == BET_25:
@@ -117,7 +133,7 @@ def compute_ev(
         bet_size = max(0.5, round(pot_after_call * 0.5, 2))
     elif action == BET_100:
         bet_size = max(0.5, round(pot_after_call * 1.0, 2))
-    else:  # ALL_IN
+    else:  # ALL_IN (here, strictly more than to_call -- a genuine raise)
         bet_size = my_stack
     bet_size = min(bet_size, my_stack)
     cost = bet_size
@@ -244,6 +260,12 @@ def compute_ev_multiway(
         final_pot = pot + cost
         return _equity() * final_pot - cost
 
+    if action == ALL_IN and to_call > 0 and my_stack <= to_call:
+        # Capped call, not a bet/raise -- see the matching comment in compute_ev().
+        cost = my_stack
+        final_pot = pot + cost
+        return _equity() * final_pot - cost
+
     # Bet/raise
     pot_after_call = pot + to_call if to_call > 0 else pot
     if action == BET_25:
@@ -252,7 +274,7 @@ def compute_ev_multiway(
         bet_size = max(0.5, round(pot_after_call * 0.5, 2))
     elif action == BET_100:
         bet_size = max(0.5, round(pot_after_call * 1.0, 2))
-    else:  # ALL_IN
+    else:  # ALL_IN (here, strictly more than to_call -- a genuine raise)
         bet_size = my_stack
     bet_size = min(bet_size, my_stack)
     cost = bet_size

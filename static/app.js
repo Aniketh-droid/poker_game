@@ -20,16 +20,6 @@ const SEAT_LAYOUTS = {
   6: [{ t: 90, l: 50 }, { t: 66, l: 5 }, { t: 24, l: 10 }, { t: 6, l: 50 }, { t: 24, l: 90 }, { t: 66, l: 95 }],
 };
 
-function switchTab(tab) {
-  document.getElementById('nav-play').classList.remove('active');
-  document.getElementById('nav-arena').classList.remove('active');
-  document.getElementById(`nav-${tab}`).classList.add('active');
-
-  document.getElementById('tab-play').classList.add('hidden');
-  document.getElementById('tab-arena').classList.add('hidden');
-  document.getElementById(`tab-${tab}`).classList.remove('hidden');
-}
-
 // ---------- Card rendering ----------
 function renderCard(cardStr, isBack = false) {
   if (isBack) return `<div class="card-back"></div>`;
@@ -264,11 +254,13 @@ function renderSeats(state) {
 
     const isDealer = state.button === p.seat;
     const cardsHtml = p.is_hero ? '' : `<div class="seat-cards">${p.folded ? '' : renderCard('', true) + renderCard('', true)}</div>`;
+    const roleBadge = p.is_sb ? '<div class="seat-role-btn seat-role-sb">SB</div>'
+      : p.is_bb ? '<div class="seat-role-btn seat-role-bb">BB</div>' : '';
 
     seatEl.innerHTML = `
       <div class="seat-avatar-wrap">
         <div class="seat-avatar">${p.avatar || '🤖'}</div>
-        ${isDealer ? '<div class="seat-dealer-btn">D</div>' : ''}
+        ${isDealer ? '<div class="seat-dealer-btn">D</div>' : roleBadge}
       </div>
       <div class="seat-name">${p.name}</div>
       <div class="seat-stack">${money(p.stack)}</div>
@@ -345,55 +337,6 @@ function sendAction(action) {
 function requestNextHand() {
   document.getElementById('result-banner').classList.add('hidden');
   fetch('/api/next_hand', { method: 'POST' }).then(() => pollState());
-}
-
-// ---------- Simulation Arena (secondary academic mode) ----------
-function runSimulation() {
-  const btn = document.getElementById('btn-simulate');
-  const loading = document.getElementById('sim-loading');
-  const results = document.getElementById('sim-results');
-
-  const matchup = document.getElementById('sim-matchup').value;
-  const hands = parseInt(document.getElementById('sim-hands').value) || 200;
-
-  btn.disabled = true;
-  results.classList.add('hidden');
-  loading.classList.remove('hidden');
-
-  fetch('/api/simulate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchup, hands }),
-  })
-    .then(r => r.json())
-    .then(data => {
-      loading.classList.add('hidden');
-      results.classList.remove('hidden');
-      btn.disabled = false;
-
-      const titleArgs = (data.name || '').replace(' UI', '').split(' vs ');
-      const a1 = titleArgs[0] || 'Agent 1';
-      const a2 = titleArgs[1] || 'Agent 2';
-
-      document.getElementById('res-winner').innerText = data.mean_chip_gain > 0 ? a1 : a2;
-      document.getElementById('res-winrate').innerText = (data.win_rate * 100).toFixed(1) + '%';
-      document.getElementById('res-tierate').innerText = (data.tie_rate * 100).toFixed(1) + '%';
-      document.getElementById('res-time').innerText = data.elapsed.toFixed(1) + 's';
-
-      const plotImg = document.getElementById('res-plot');
-      if (data.plot_path) {
-        plotImg.src = `/${data.plot_path}?t=` + new Date().getTime();
-        plotImg.classList.remove('hidden');
-      } else {
-        plotImg.classList.add('hidden');
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      loading.classList.add('hidden');
-      btn.disabled = false;
-      alert('Failed to run simulation');
-    });
 }
 
 // ---------- Boot ----------

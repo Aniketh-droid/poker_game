@@ -3,6 +3,7 @@ import os
 import random
 import secrets
 import threading
+import time
 import uuid
 
 from flask import Flask, jsonify, request, send_from_directory, session
@@ -49,6 +50,12 @@ _state_lock = threading.Lock()
 MIN_PLAYERS = 2
 MAX_PLAYERS = 6
 STARTING_STACK = 50.0 * BB
+
+# Pacing for bot turns, so a human can actually follow the hand instead of
+# watching several bots act between one poll and the next. Only applied to
+# bots (seat != 0) -- the human's own turn is already paced by them deciding.
+ACTION_REVEAL_DELAY = 1.1   # pause after a bot's action lands, before it's applied
+TAUNT_FOLLOWUP_DELAY = 0.7  # further pause after a delayed taunt appears
 
 
 def _default_state() -> dict:
@@ -143,6 +150,15 @@ def _publish_table_snapshot(state: dict, game_state, seat_meta: list) -> None:
     folded = getattr(game_state, "folded", set())
     all_in = getattr(game_state, "all_in", set())
     street_bets = getattr(game_state, "street_bets", [0.0] * n)
+    button = getattr(game_state, "button", 0)
+    # Same button-relative blind formula play_hand_multiway() uses to actually
+    # post blinds -- computed here too so the UI can label SB/BB seats and make
+    # the turn order (blinds -> first-to-act -> clockwise) visually obvious,
+    # rather than the human having to infer it from chip amounts alone.
+    if n == 2:
+        sb_seat, bb_seat = button % n, (button + 1) % n
+    else:
+        sb_seat, bb_seat = (button + 1) % n, (button + 2) % n
     players = []
     for i in range(n):
         meta = seat_meta[i] if i < len(seat_meta) else {}
@@ -152,6 +168,7 @@ def _publish_table_snapshot(state: dict, game_state, seat_meta: list) -> None:
             "stack": game_state.stacks[i],
             "street_bet": street_bets[i] if i < len(street_bets) else 0.0,
             "folded": i in folded, "all_in": i in all_in,
+            "is_sb": i == sb_seat, "is_bb": i == bb_seat,
         })
     with _state_lock:
         state["players"] = players
@@ -192,6 +209,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
 
     def _wrap(agent_obj, seat_idx):
         original_act = agent_obj.act
+        is_hero = (seat_idx == 0)
 
         def wrapped(game_state):
             to_call_before = getattr(game_state, "to_call", 0.0)
@@ -199,12 +217,36 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
             action = original_act(game_state)
             meta = seat_meta[seat_idx]
             trigger = _trigger_for_action(action, to_call_before)
-            taunt = get_taunt(meta["key"], trigger, rng=random.Random(base_seed + seat_idx + hash(action) % 997)) \
-                if meta["key"] != "human" else ""
+            street = game_state.street
+
+            # 1) Announce the action itself first -- "The Rock raises to $10"
+            #    lands on its own, with no taunt attached yet.
             _log_event(state, {
                 "seat": seat_idx, "name": meta["name"], "avatar": meta["avatar"],
-                "action": action, "street": game_state.street, "trigger": trigger, "taunt": taunt,
+                "action": action, "street": street, "trigger": trigger, "taunt": "",
             })
+
+            if is_hero:
+                # The human's own turn is already paced by them deciding --
+                # no artificial delay, and humans have no taunts to reveal.
+                return action
+
+            # 2) Give the human a moment to actually see that action land
+            #    before the next seat's turn starts. Without this, several
+            #    bots played out a whole betting round between one poll and
+            #    the next, and it looked like nothing was happening in order.
+            time.sleep(ACTION_REVEAL_DELAY)
+
+            # 3) THEN reveal the taunt as its own follow-up beat, if this
+            #    personality has one for what it just did.
+            taunt = get_taunt(meta["key"], trigger, rng=random.Random(base_seed + seat_idx + hash(action) % 997))
+            if taunt:
+                _log_event(state, {
+                    "seat": seat_idx, "name": meta["name"], "avatar": meta["avatar"],
+                    "action": None, "street": street, "trigger": trigger, "taunt": taunt,
+                })
+                time.sleep(TAUNT_FOLLOWUP_DELAY)
+
             return action
         agent_obj.act = wrapped
 
@@ -258,6 +300,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
                         "seat": i, "name": meta["name"], "avatar": meta["avatar"],
                         "action": None, "street": 4, "trigger": trig, "taunt": t,
                     })
+                    time.sleep(0.5)  # let each reaction land on its own beat
 
             with _state_lock:
                 state["stacks"] = list(stacks)
@@ -388,46 +431,6 @@ def leave_game():
         if nh is not None:
             nh.set()
     return jsonify({"status": "ok"})
-
-
-@app.route('/api/simulate', methods=['POST'])
-def run_simulation():
-    """Secondary 'Simulation Arena' feature: the original academic head-to-head
-    benchmark (Bayesian vs EV vs Random), kept as a separate mode from the
-    playable multiway table above."""
-    body = request.get_json(silent=True) or {}
-    matchup = body.get("matchup", "bayesian_vs_ev")
-    try:
-        hands = int(body.get("hands", 100))
-    except (TypeError, ValueError):
-        return jsonify({"error": "hands must be an integer"}), 400
-    hands = max(1, min(hands, 5000))  # guard against absurd/blocking request sizes
-    seeds = [12345]  # keeping it fast for web ui
-    samples = 25
-
-    from main import _run_pairing
-
-    try:
-        if matchup == "bayesian_vs_ev":
-            res = _run_pairing("Bayesian vs EV UI",
-                lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="TIGHT", forgetting_factor=0.01),
-                lambda s: EVAgent(player_id=1, epsilon=0.05, samples=samples, seed=s),
-                hands, seeds, samples)
-        elif matchup == "bayesian_vs_random":
-            res = _run_pairing("Bayesian vs Random UI",
-                lambda s: BayesianAgent(player_id=0, epsilon=0.05, samples=samples, seed=s, opponent_type="LOOSE", forgetting_factor=0.01),
-                lambda s: RandomAgent(player_id=1),
-                hands, seeds, samples)
-        else:
-            res = _run_pairing("EV vs Random UI",
-                lambda s: EVAgent(player_id=0, epsilon=0.05, samples=samples, seed=s),
-                lambda s: RandomAgent(player_id=1),
-                hands, seeds, samples)
-    except Exception:
-        logger.exception("Simulation failed for matchup=%s hands=%s", matchup, hands)
-        return jsonify({"error": "Simulation failed"}), 500
-
-    return jsonify(res)
 
 
 if __name__ == '__main__':

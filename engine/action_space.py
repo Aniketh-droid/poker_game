@@ -54,6 +54,18 @@ def get_legal_actions(game_state: Any, player_id: int) -> List[str]:
     if to_call > 0 and my_stack >= to_call:
         legal.append(CALL)
 
+    # BUG FIX: an all-in for LESS than the call amount (0 < my_stack < to_call)
+    # is a capped call, not a raise -- a short-stacked player must always be
+    # able to shove their remaining chips. It used to require `my_stack >
+    # to_call`, which covers only an all-in RAISE; a short-stacked player who
+    # couldn't fully call (blocked from CALL above too) got NEITHER action,
+    # leaving only FOLD. Handled here, before the raise-cap check below, since
+    # a capped call doesn't reopen betting and must stay legal even after the
+    # raise cap is hit -- unlike an all-in raise, which the cap should still
+    # block (see the ALL_IN-as-raise case further down).
+    if to_call > 0 and 0 < my_stack < to_call:
+        legal.append(ALL_IN)
+
     if raises_this_street >= 2:
         return legal
 
@@ -70,6 +82,10 @@ def get_legal_actions(game_state: Any, player_id: int) -> List[str]:
         legal.append(BET_50)
     if my_stack >= bet_100_size and bet_100_size > my_bet_this_street and BET_100 not in legal:
         legal.append(BET_100)
+    # All-in as a RAISE (strictly more than to_call): a genuine raise, so it's
+    # correctly gated by the raise cap via the early return above. (my_stack ==
+    # to_call exactly is deliberately excluded here too -- CALL already covers
+    # that case, no need for a redundant identical ALL_IN button.)
     if my_stack > 0 and my_stack > to_call:
         legal.append(ALL_IN)
 

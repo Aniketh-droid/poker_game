@@ -14,10 +14,15 @@ class WebHumanAgent(BaseAgent):
     MULTIWAY: generalized from a single "villain" to an N-seat (2-6) table.
     `seat_meta` is a fixed list (indexed by seat) of {key, name, avatar} for
     every seat at the table, supplied once by the caller (app.py) when the
-    match starts; act() combines that with the live game_state to publish a
-    `players` snapshot the frontend can render a whole table from, not just
-    one opponent. Other seats' hole cards are never put in shared_state here
+    match starts. Other seats' hole cards are never put in shared_state here
     -- they stay server-side until the match loop reveals them at showdown.
+
+    Note: the full `players` table snapshot (stacks, bets, folded/all-in,
+    SB/BB seats) is published by app.py's per-seat wrapper via
+    `_publish_table_snapshot()` immediately before this act() runs for every
+    seat, hero included -- so this class only needs to add the fields unique
+    to the human's own turn (legal actions, hero's own cards, the waiting
+    flag) rather than rebuilding the whole table view a second time here.
     """
 
     def __init__(self, player_id: int, shared_state: dict, action_event: threading.Event, seat_meta: List[Dict]):
@@ -31,35 +36,9 @@ class WebHumanAgent(BaseAgent):
         if not legal:
             return "FOLD"
 
-        n = len(game_state.stacks)
-        folded = game_state.folded if hasattr(game_state, "folded") else set()
-        all_in = getattr(game_state, "all_in", set())
-        street_bets = getattr(game_state, "street_bets", [0.0] * n)
-
-        players = []
-        for i in range(n):
-            meta = self.seat_meta[i] if i < len(self.seat_meta) else {}
-            players.append({
-                "seat": i,
-                "is_hero": i == self.player_id,
-                "key": meta.get("key"),
-                "name": meta.get("name"),
-                "avatar": meta.get("avatar"),
-                "stack": game_state.stacks[i],
-                "street_bet": street_bets[i] if i < len(street_bets) else 0.0,
-                "folded": i in folded,
-                "all_in": i in all_in,
-            })
-
         self.shared_state["waiting_for_human"] = True
-        self.shared_state["street"] = game_state.street
-        self.shared_state["pot"] = game_state.pot
-        self.shared_state["board"] = [str(c) for c in game_state.board]
         self.shared_state["hero_cards"] = [str(c) for c in game_state.private_cards.get(self.player_id, [])]
-        self.shared_state["players"] = players
         self.shared_state["legal_actions"] = legal
-        self.shared_state["to_call"] = getattr(game_state, "to_call", 0.0)
-        self.shared_state["button"] = getattr(game_state, "button", 0)
         self.shared_state["current_seat"] = self.player_id
 
         # Clear any previous action

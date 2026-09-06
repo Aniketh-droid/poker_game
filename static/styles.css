@@ -80,26 +80,6 @@ body {
   box-shadow: 0 0 10px rgba(255,84,112,0.5);
 }
 
-.nav-tabs { display: flex; gap: 8px; }
-.nav-tab {
-  padding: 9px 18px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-weight: 600;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.nav-tab:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
-.nav-tab.active {
-  color: var(--bg-deep);
-  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
-  box-shadow: 0 0 18px rgba(240,192,90,0.4);
-}
-
 /* ---------- Layout shells ---------- */
 .page {
   max-width: 1180px;
@@ -368,6 +348,16 @@ body {
   box-shadow: 0 0 8px rgba(0,0,0,0.4);
 }
 
+.seat-role-btn {
+  position: absolute; top: -4px; right: -6px;
+  min-width: 20px; height: 18px; padding: 0 5px; border-radius: 999px;
+  font-size: 0.58rem; font-weight: 800; letter-spacing: 0.02em;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 8px rgba(0,0,0,0.4);
+}
+.seat-role-sb { background: var(--neon-cyan); color: #04231f; border: 1.5px solid rgba(4,35,31,0.4); }
+.seat-role-bb { background: var(--neon-pink); color: #2a0410; border: 1.5px solid rgba(42,4,16,0.4); }
+
 .seat-name { font-weight: 700; font-size: 0.82rem; }
 .seat-stack { font-size: 0.76rem; color: var(--gold-bright); font-weight: 600; }
 .seat-bet-chip {
@@ -591,36 +581,5 @@ body {
   color: var(--gold-bright);
 }
 .overlay-card p { color: var(--text-dim); margin-bottom: 22px; }
-
-/* ---------- Simulation Arena (secondary academic tab) ---------- */
-.arena-card {
-  background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
-  border: 1px solid var(--border-soft);
-  border-radius: 20px;
-  padding: 26px;
-  margin-bottom: 20px;
-}
-.arena-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px; }
-.field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-group label { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
-.field-group select, .field-group input {
-  padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border-soft);
-  background: rgba(255,255,255,0.03); color: var(--text-main); font-family: inherit; font-size: 0.9rem;
-}
-.arena-results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
-@media (max-width: 700px) { .arena-results { grid-template-columns: repeat(2, 1fr); } }
-.stat-tile {
-  background: rgba(255,255,255,0.03); border: 1px solid var(--border-soft); border-radius: 14px;
-  padding: 14px; text-align: center;
-}
-.stat-tile .st-label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
-.stat-tile .st-value { font-size: 1.3rem; font-weight: 800; color: var(--gold-bright); margin-top: 4px; }
-.arena-plot { width: 100%; border-radius: 14px; border: 1px solid var(--border-soft); }
-.loading-spinner {
-  display: inline-block; width: 18px; height: 18px; border-radius: 50%;
-  border: 3px solid rgba(240,192,90,0.25); border-top-color: var(--gold-bright);
-  animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .footer-note { text-align: center; color: var(--text-dim); font-size: 0.78rem; margin-top: 30px; }
