@@ -16,6 +16,38 @@ from engine.game_state import GameState
 from engine.action_space import BB, get_legal_actions
 
 
+def _deal_board_to_current_street(state: GameState, deck: Deck) -> None:
+    """
+    Deal community cards to catch the board up with state.street.
+
+    BUG THIS FIXES: GameState can advance MULTIPLE streets in a single
+    apply_action() call. Once the last actionable player commits and every
+    live player is either all-in or has matched the biggest bet,
+    GameState._run_out_remaining_streets() cascades street-by-street all the
+    way to the river (or to terminal) internally, with no pause for the
+    caller to deal cards in between -- it has no deck, so it can't deal them
+    itself. The old dealing logic here only ever checked "did street move
+    from N to N+1 since last time", so a cascade (e.g. a preflop all-in,
+    where street jumps straight from 0 to 4) was invisible to it: the board
+    never got flop/turn/river cards at all. resolve_showdown()'s
+    `len(cards) >= 5` guard then treated every hand as unevaluable and fell
+    back to chopping the pot evenly -- regardless of either player's actual
+    cards. (Confirmed via direct repro: 200/200 heads-up preflop all-ins
+    resolved as an even chop with a 0-card board before this fix.)
+
+    This instead deals however many stages the board fell behind, one stage
+    at a time (flop=3, turn=1, river=1), so a normal single-street advance
+    still draws cards in exactly the same order as before.
+    """
+    target_len_by_street = {0: 0, 1: 3, 2: 4, 3: 5}
+    target = target_len_by_street.get(min(state.street, 3), 5)
+    while len(state.board) < target:
+        if len(state.board) == 0:
+            state.board.extend(deck.deal(3))
+        else:
+            state.board.extend(deck.deal(1))
+
+
 def play_hand(
     agent1: Any,
     agent2: Any,
@@ -90,13 +122,9 @@ def play_hand(
         state.apply_action(action)
         agents[1 - pid].observe(action, street=acted_street, actor_id=pid)
 
-        # Deal next board cards when street advanced
-        if state.street == 1 and len(state.board) == 0:
-            state.board.extend(deck.deal(3))
-        elif state.street == 2 and len(state.board) == 3:
-            state.board.extend(deck.deal(1))
-        elif state.street == 3 and len(state.board) == 4:
-            state.board.extend(deck.deal(1))
+        # Deal next board cards when street advanced (handles a street cascade
+        # too -- see _deal_board_to_current_street's docstring).
+        _deal_board_to_current_street(state, deck)
 
     if len(state.folded) > 0:
         deltas = state.resolve_showdown(evaluator)
@@ -252,12 +280,9 @@ def play_hand_multiway(
             if j != pid:
                 agents[j].observe(action, street=acted_street, actor_id=pid)
 
-        if state.street == 1 and len(state.board) == 0:
-            state.board.extend(deck.deal(3))
-        elif state.street == 2 and len(state.board) == 3:
-            state.board.extend(deck.deal(1))
-        elif state.street == 3 and len(state.board) == 4:
-            state.board.extend(deck.deal(1))
+        # Deal next board cards when street advanced (handles a street cascade
+        # too -- see _deal_board_to_current_street's docstring).
+        _deal_board_to_current_street(state, deck)
 
     deltas = state.resolve_showdown(evaluator)
     for i in range(n):

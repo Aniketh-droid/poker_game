@@ -409,6 +409,18 @@ body {
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   border: 6px solid transparent; border-top-color: var(--text-main);
 }
+/* Seats near the top of the oval table have no headroom above them --
+   flip the bubble to render below the seat instead, arrow pointing up. */
+.speech-bubble.speech-bubble-below {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+.speech-bubble.speech-bubble-below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--text-main);
+}
 @keyframes bubbleIn { from { opacity: 0; transform: translateX(-50%) scale(0.85) translateY(4px); } to { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); } }
 @keyframes bubbleOut { to { opacity: 0; transform: translateX(-50%) scale(0.9) translateY(-4px); } }
 
@@ -553,6 +565,35 @@ body {
 }
 .result-banner .r-title { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--gold-bright); margin-bottom: 4px; }
 .result-banner .r-sub { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 12px; }
+
+/* Post-hand "why did they do that" decision-rationale panel */
+.rationale-panel {
+  text-align: left;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  background: rgba(5,7,14,0.35);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+.rationale-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rationale-entry:last-child { border-bottom: none; }
+.ra-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.ra-avatar { font-size: 1rem; }
+.ra-action {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+}
+.ra-summary { font-size: 0.8rem; line-height: 1.4; color: var(--text-dim); }
+.rationale-empty { color: var(--text-dim); font-size: 0.82rem; text-align: center; padding: 6px 0; }
 
 /* ---------- Game over overlay ---------- */
 .overlay {

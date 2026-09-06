@@ -45,6 +45,9 @@ class ManiacAgent(BaseAgent):
         # is small on purpose.
         weak = bucket in (TRASH, AIR, WEAK_DRAW, SPECULATIVE)
         fire_prob = self.aggression - (0.15 if weak else 0.0)
+        # Exposed for the post-hand decision-rationale panel (decision/rationale.py).
+        self._last_bucket = bucket
+        self._last_fire_prob = fire_prob
 
         bet_actions = [a for a in (ALL_IN, BET_100, BET_50, BET_25) if a in legal]
         can_check = CHECK in legal

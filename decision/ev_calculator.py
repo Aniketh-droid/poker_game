@@ -8,12 +8,42 @@ makes the agent falsely think calling is more expensive the more it has already 
 which can cause it to fold when it shouldn't. Correct formula is:
     equity * final_pot - cost
 where cost is only the current action's cost.
+
+FIX: compute_ev() (the single-opponent path) used to read the opponent's
+current-street bet via the hardcoded index `street_bets[1 - pid]`. That's
+only correct when the two players occupy seats 0 and 1. EVAgent and
+BayesianAgent both call this exact function whenever exactly one opponent is
+still live -- which, at a 3-6 handed table, happens any time enough players
+have folded to leave two live seats that AREN'T 0 and 1 (e.g. seats 2 and 4
+heads-up after everyone else folds). `1 - pid` then reads a different,
+often-folded seat's stale bet via Python's negative-index wraparound,
+producing a wrong `to_call` and therefore a wrong EV for every action.
+`_opponent_bet_this_street` below fixes this by asking game_state itself
+who the live opponent actually is (falling back to the old `1 - pid` only
+for legacy 2-only test doubles that don't implement live_players()).
 """
 
 from typing import Any, Dict, List, Optional
 
 from engine.action_space import get_legal_actions, FOLD, CHECK, CALL, BET_25, BET_50, BET_100, ALL_IN
 from evaluation.monte_carlo import estimate_equity, estimate_equity_multiway
+
+
+def _opponent_bet_this_street(game_state: Any, pid: int) -> float:
+    """Return the sole live opponent's current-street bet, correctly identifying
+    that opponent's seat even at a 3-6 handed table reduced to heads-up (rather
+    than assuming seats 0/1 via a hardcoded `1 - pid`)."""
+    street_bets = getattr(game_state, "street_bets", [0.0, 0.0])
+    if hasattr(game_state, "live_players"):
+        live_opponents = [i for i in game_state.live_players() if i != pid]
+        if len(live_opponents) == 1:
+            return street_bets[live_opponents[0]]
+        if len(live_opponents) > 1:
+            # compute_ev() is only meant to be called with <=1 live opponent;
+            # defensively take the largest opposing bet rather than guessing.
+            return max(street_bets[i] for i in live_opponents)
+    # Legacy 2-only test doubles without live_players(): original assumption.
+    return street_bets[1 - pid]
 
 
 def _belief_cache_key(belief: Optional[Dict[str, float]]) -> Optional[tuple]:
@@ -78,7 +108,7 @@ def compute_ev(
     pot = game_state.pot
     street_bets = getattr(game_state, "street_bets", [0.0, 0.0])
     my_bet_this_street = street_bets[pid]
-    opp_bet_this_street = street_bets[1 - pid]
+    opp_bet_this_street = _opponent_bet_this_street(game_state, pid)
     to_call = max(0.0, opp_bet_this_street - my_bet_this_street)
     my_stack = stacks[pid]
 

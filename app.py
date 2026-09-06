@@ -17,8 +17,9 @@ from agents.maniac_agent import ManiacAgent
 from agents.calling_station_agent import CallingStationAgent
 from agents.data_scientist_agent import DataScientistAgent
 from agents.personalities import PERSONALITIES, list_personalities, get_taunt
-from engine.action_space import BB, FOLD, CHECK, CALL, BET_25, BET_50, BET_100, ALL_IN
+from engine.action_space import BB, FOLD, CHECK, CALL, BET_25, BET_50, BET_100, ALL_IN, get_legal_actions
 from engine.game_engine import play_hand_multiway
+from decision.rationale import explain_decision
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -207,6 +208,14 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
     bots = [build_bot(k, i + 1, seed=base_seed + i * 977) for i, k in enumerate(bot_keys)]
     agents = [hero] + bots
 
+    # Holds this HAND's decision rationale (why each bot chose what it chose),
+    # reset at the top of every hand below. Deliberately never written into
+    # `state` (and so never served by /api/state) until the hand is over --
+    # a bot's EV/belief numbers imply its hole-card strength, so revealing
+    # them mid-hand would let a human opponent read bots' hands off this
+    # panel instead of playing the game. See decision/rationale.py.
+    hand_ctx = {"rationale": []}
+
     def _wrap(agent_obj, seat_idx):
         original_act = agent_obj.act
         is_hero = (seat_idx == 0)
@@ -225,6 +234,24 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
                 "seat": seat_idx, "name": meta["name"], "avatar": meta["avatar"],
                 "action": action, "street": street, "trigger": trigger, "taunt": "",
             })
+
+            if not is_hero:
+                # Capture WHY this bot chose this action, from its own real
+                # decision-time state (EV dict, hand bucket, belief, fire
+                # probability -- whatever that agent type actually used).
+                # Held in hand_ctx, not `state`, until the hand ends (see
+                # hand_ctx's comment above) -- revealed all at once via
+                # last_result.decision_log once the hand is over.
+                try:
+                    legal_seen = get_legal_actions(game_state, seat_idx)
+                    rationale = explain_decision(agent_obj, action, legal_seen, seat_idx)
+                    rationale["name"] = meta["name"]
+                    rationale["avatar"] = meta["avatar"]
+                    rationale["action"] = action
+                    rationale["street"] = street
+                    hand_ctx["rationale"].append(rationale)
+                except Exception:
+                    logger.exception("Failed to build decision rationale for seat %s", seat_idx)
 
             if is_hero:
                 # The human's own turn is already paced by them deciding --
@@ -275,6 +302,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
             state["hand_number"] = hand_number
             state["hand_over"] = False
             state["last_result"] = None
+            hand_ctx["rationale"] = []
 
             result = play_hand_multiway(
                 agents, seed=base_seed + hand_number * 7919, evaluator=evaluator,
@@ -314,6 +342,9 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
                     "reveals": reveals,
                     "hand_number": hand_number,
                     "stacks": list(stacks),
+                    # Why each bot did what it did this hand, in action order --
+                    # only ever attached here (post hand-over), never surfaced live.
+                    "decision_log": list(hand_ctx["rationale"]),
                 }
                 state["hand_over"] = True
                 state["waiting_for_human"] = False

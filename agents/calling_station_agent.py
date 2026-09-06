@@ -38,6 +38,8 @@ class CallingStationAgent(BaseAgent):
 
         bucket = self._bucket(game_state)
         very_strong = bucket in (PREMIUM, STRONG_MADE, STRONG_DRAW)
+        # Exposed for the post-hand decision-rationale panel (decision/rationale.py).
+        self._last_bucket = bucket
 
         can_check = CHECK in legal
         can_call = CALL in legal

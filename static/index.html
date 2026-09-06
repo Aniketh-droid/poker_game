@@ -55,6 +55,8 @@
         <div class="result-banner hidden" id="result-banner">
           <div class="r-title" id="result-title"></div>
           <div class="r-sub" id="result-sub"></div>
+          <button class="btn-ghost" id="btn-rationale-toggle" onclick="togglePanel('rationale-panel')">Why did they play that way?</button>
+          <div class="rationale-panel hidden" id="rationale-panel"></div>
           <button class="btn-primary" onclick="requestNextHand()">Deal Next Hand</button>
         </div>
 
@@ -88,6 +90,8 @@
       <div class="oc-emoji" id="go-emoji">&#127942;</div>
       <h2 id="go-title">Game Over</h2>
       <p id="go-sub"></p>
+      <button class="btn-ghost" id="go-rationale-toggle" onclick="togglePanel('go-rationale-panel')">Why did they play that way? (final hand)</button>
+      <div class="rationale-panel hidden" id="go-rationale-panel"></div>
       <button class="btn-primary" onclick="resetToSetup()">Back to Table Setup</button>
     </div>
   </div>

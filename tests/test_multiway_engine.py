@@ -128,6 +128,52 @@ class TestMultiwayFoldsDownToOne(unittest.TestCase):
         self.assertGreater(result["chip_delta"][3], 0.0)
 
 
+class TestAllInRunOutDealsTheFullBoard(unittest.TestCase):
+    """
+    Regression test for a bug where an all-in confrontation that closes
+    action with nobody left to act (the common "shove preflop, get called"
+    case) made GameState cascade straight from street 0 to terminal inside
+    a single apply_action() call. The engine's board-dealing code only ever
+    checked for a street advancing ONE step at a time, so it never dealt a
+    single community card for a preflop all-in -- resolve_showdown() then
+    saw < 5 total cards for every hand, treated them as unevaluable, and
+    chopped the pot evenly regardless of either player's actual cards.
+    Confirmed via direct repro before the fix: 200/200 heads-up preflop
+    all-ins resolved as an even chop with a 0-card board.
+    """
+
+    def test_heads_up_preflop_all_in_deals_a_full_five_card_board(self):
+        board_lens = []
+        chops = 0
+        for i in range(150):
+            agents = [_AllInAgent(0), _AllInAgent(1)]
+            result = play_hand_multiway(
+                agents, seed=i, evaluator=_Eval(), button=i % 2,
+                stacks=[20.0, 20.0], return_details=True,
+            )
+            board_lens.append(len(result["board"]))
+            if len(result["winner_ids"]) > 1 or result["outcome"] == "tie":
+                chops += 1
+
+        self.assertTrue(all(n == 5 for n in board_lens), f"board lengths: {set(board_lens)}")
+        # A real river should decide most of these -- only genuine ties chop.
+        # (Before the fix this was 150/150; a generous upper bound here still
+        # catches a regression back to "always chops" without being flaky
+        # about the exact tie rate across random deals.)
+        self.assertLess(chops, 40, f"{chops}/150 hands chopped -- board may not be resolving hands correctly")
+
+    def test_multiway_all_in_on_the_flop_deals_turn_and_river(self):
+        """Same bug, three-handed, forcing the cascade to start mid-hand (after
+        the flop) instead of at street 0, to check the fix isn't preflop-only."""
+        for i in range(30):
+            agents = [_AllInAgent(0), _AllInAgent(1), _AllInAgent(2)]
+            result = play_hand_multiway(
+                agents, seed=5000 + i, evaluator=_Eval(), button=i % 3,
+                stacks=[40.0, 40.0, 40.0], return_details=True,
+            )
+            self.assertEqual(len(result["board"]), 5, f"hand {i}: board={result['board']}")
+
+
 class TestHeadsUpBackwardCompatibility(unittest.TestCase):
     def test_play_hand_and_play_hand_multiway_agree_at_two_players(self):
         """The original 2-player play_hand() must keep behaving exactly as before;

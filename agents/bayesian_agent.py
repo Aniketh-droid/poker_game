@@ -288,6 +288,8 @@ class BayesianAgent(BaseAgent):
 
         self._last_ev_dict = ev_dict
         self._last_entropy = entropy
+        # Exposed for the post-hand decision-rationale panel (decision/rationale.py).
+        self._last_num_opponents = len(live_opponents)
 
         self._entropy_history.append(entropy)
         self._hand_actions.append(chosen)

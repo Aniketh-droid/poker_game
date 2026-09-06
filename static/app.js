@@ -169,6 +169,7 @@ function updateUI(state) {
 
   renderSeats(state);
   renderLog(state);
+  renderDecisionLog(state);
 
   // Action panel
   const actionPanel = document.getElementById('action-panel');
@@ -304,25 +305,58 @@ function renderLog(state) {
     list.insertBefore(div, list.firstChild);
 
     // Also float it as a speech bubble over the seat, if we can find it.
-    if (e.taunt) showBubble(e.seat, e.taunt);
+    if (e.taunt) showBubble(e.seat, e.taunt, state.num_players);
   });
   shownLogCount = log.length;
   // Cap the DOM list so a long session doesn't bloat the page.
   while (list.children.length > 80) list.removeChild(list.lastChild);
 }
 
-function showBubble(seat, text) {
+function showBubble(seat, text, numPlayers) {
   const container = document.getElementById('seats-container');
   if (!container || !container.children[seat]) return;
   const seatEl = container.children[seat];
   const old = seatEl.querySelector('.speech-bubble');
   if (old) old.remove();
   const bubble = document.createElement('div');
-  bubble.className = 'speech-bubble';
+  // Seats sitting near the top of the oval table don't have room for a
+  // bubble rendered above them -- flip it below for those seats instead.
+  const layout = SEAT_LAYOUTS[numPlayers] || SEAT_LAYOUTS[4];
+  const pos = layout[seat] || layout[layout.length - 1];
+  const nearTop = pos && pos.t <= 25;
+  bubble.className = 'speech-bubble' + (nearTop ? ' speech-bubble-below' : '');
   bubble.innerText = text;
   seatEl.appendChild(bubble);
   clearTimeout(seatBubbleTimers[seat]);
   seatBubbleTimers[seat] = setTimeout(() => bubble.remove(), 3600);
+}
+
+// ---------- Post-hand decision rationale ("why did they play that way") ----------
+// Revealed only once a hand is over (state.last_result.decision_log is only ever
+// populated server-side after the hand ends -- see app.py's hand_ctx), so this
+// never leaks a bot's hand strength while the hand is still live.
+function togglePanel(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden');
+}
+
+function renderDecisionLog(state) {
+  const log = (state.last_result && state.last_result.decision_log) || [];
+  const html = log.length
+    ? log.map(e => `
+        <div class="rationale-entry">
+          <div class="ra-head">
+            <span class="ra-avatar">${e.avatar || ''}</span>
+            <b>${e.name || ('Seat ' + e.seat)}</b>
+            <span class="ra-action">${(e.action || '').replace('_', ' ')}</span>
+          </div>
+          <div class="ra-summary">${e.summary || ''}</div>
+        </div>`).join('')
+    : '<div class="rationale-empty">Nothing to explain yet.</div>';
+  ['rationale-panel', 'go-rationale-panel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  });
 }
 
 function sendAction(action) {

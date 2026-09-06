@@ -64,5 +64,7 @@ class EVAgent(BaseAgent):
 
         chosen = select_action(ev_dict, legal, epsilon=self.epsilon, rng=self._rng)
         self._last_ev_dict = ev_dict
+        # Exposed for the post-hand decision-rationale panel (decision/rationale.py).
+        self._last_num_opponents = len(live_opponents)
         self._hand_actions.append(chosen)
         return chosen

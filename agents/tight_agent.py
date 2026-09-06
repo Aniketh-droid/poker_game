@@ -23,6 +23,9 @@ class TightAgent(BaseAgent):
             bucket = classify_preflop(hand)
         else:
             bucket = classify_postflop(hand, board)
+        # Exposed for the post-hand decision-rationale panel (decision/rationale.py) --
+        # not used by the decision logic itself, just a record of what it computed.
+        self._last_bucket = bucket
 
         if bucket == PREMIUM:
             if BET_100 in legal:
