@@ -129,15 +129,25 @@ def build_bot(personality_key: str, player_id: int, seed: int):
     return RandomAgent(player_id=player_id, rng=random.Random(seed))
 
 
+_BET_SIZE_LABEL = {BET_25: "25", BET_50: "50", BET_100: "100"}
+
+
 def _trigger_for_action(action: str, to_call_before: float) -> str:
+    """Trigger key for get_taunt(). Bet/raise actions carry their size
+    (bet_25/raise_50/etc) so personalities can have a distinct line for a
+    feeler bet vs. a pot-sized one; get_taunt() falls back to the generic
+    "bet"/"raise" bucket if a personality has no line for that exact size."""
     if action == FOLD:
         return "fold"
     if action == CHECK:
         return "check"
     if action == CALL:
         return "call"
-    if action in (BET_25, BET_50, BET_100, ALL_IN):
-        return "bet" if to_call_before <= 1e-9 else "raise"
+    if action == ALL_IN:
+        return "all_in"
+    if action in _BET_SIZE_LABEL:
+        kind = "bet" if to_call_before <= 1e-9 else "raise"
+        return f"{kind}_{_BET_SIZE_LABEL[action]}"
     return "idle"
 
 
@@ -214,7 +224,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
     # a bot's EV/belief numbers imply its hole-card strength, so revealing
     # them mid-hand would let a human opponent read bots' hands off this
     # panel instead of playing the game. See decision/rationale.py.
-    hand_ctx = {"rationale": []}
+    hand_ctx = {"rationale": [], "actions": []}
 
     def _wrap(agent_obj, seat_idx):
         original_act = agent_obj.act
@@ -244,7 +254,10 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
                 # last_result.decision_log once the hand is over.
                 try:
                     legal_seen = get_legal_actions(game_state, seat_idx)
-                    rationale = explain_decision(agent_obj, action, legal_seen, seat_idx)
+                    rationale = explain_decision(
+                        agent_obj, action, legal_seen, seat_idx,
+                        game_state=game_state, prior_actions=hand_ctx["actions"],
+                    )
                     rationale["name"] = meta["name"]
                     rationale["avatar"] = meta["avatar"]
                     rationale["action"] = action
@@ -252,6 +265,13 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
                     hand_ctx["rationale"].append(rationale)
                 except Exception:
                     logger.exception("Failed to build decision rationale for seat %s", seat_idx)
+
+            # Record this action in the running hand log (every seat, human
+            # included) so later bots' rationale can reference what already
+            # happened -- must happen AFTER this seat's own rationale is
+            # built above, never before, so a bot never sees its own current
+            # action as "prior" context.
+            hand_ctx["actions"].append({"seat": seat_idx, "name": meta["name"], "action": action, "street": street})
 
             if is_hero:
                 # The human's own turn is already paced by them deciding --
@@ -303,6 +323,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
             state["hand_over"] = False
             state["last_result"] = None
             hand_ctx["rationale"] = []
+            hand_ctx["actions"] = []
 
             result = play_hand_multiway(
                 agents, seed=base_seed + hand_number * 7919, evaluator=evaluator,

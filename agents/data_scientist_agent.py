@@ -89,6 +89,7 @@ class DataScientistAgent(BaseAgent):
         ev_b = getattr(self._bayes_model, "_last_ev_dict", {}) or {}
         bayes_weight = self._bayes_confidence(game_state)
         ev_weight = 1.0 - bayes_weight
+        self._last_bayes_weight = bayes_weight  # surfaced in decision/rationale.py
 
         blended = {}
         for a in legal:
