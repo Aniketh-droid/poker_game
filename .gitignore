@@ -30,14 +30,15 @@ Thumbs.db
 # Environment variables
 .env
 
-# Generated benchmark plots (regenerated on demand by main.py / the Simulation
-# Arena tab -- see experiments/visualize.py's os.makedirs(..., exist_ok=True)).
-# Not committing these keeps the repo from accumulating stale run artifacts.
-static/plots/*.png
-
 # Local tool state -- machine-specific config/cache for Claude Code hooks and
 # the "Impeccable" design-linting tool (absolute local paths, review screenshots,
 # consent/cache files). Not project source; safe to `git add .`/`-A` around.
 .claude/
 .impeccable/
 .github/hooks/
+
+# Archived research/CLI tooling (main.py, play_human.py, experiments/, and the
+# benchmark plots they generated) -- moved out of the tracked project because
+# it's the pre-pivot 2-player academic benchmark, not the playable multiway
+# game. Kept on disk for reference, deliberately not shipped to GitHub.
+archive/

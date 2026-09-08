@@ -12,9 +12,7 @@ Existing codebase, not a greenfield decision: Flask backend (`app.py`) serving a
 single-page frontend built in hand-written HTML/CSS/vanilla JS (`static/`), no
 frontend framework or build step. Python poker engine, belief, and decision
 modules under `engine/`, `belief/`, `decision/`, `evaluation/`, `agents/`.
-Runtime deps: `flask` (`matplotlib` is dev/CLI-only, used by `main.py`'s
-plotting and `experiments/visualize.py`, not the Flask app itself). Deployable
-via the included `Dockerfile`.
+Runtime deps: `flask` only. Deployable via the included `Dockerfile`.
 
 ## Users
 
@@ -61,8 +59,9 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 - Two screens today: table setup (pick size + opponents, or "Deal Me In" to fill
   randomly) and the live table (felt, seats, board, pot, hero action panel,
   "Table Talk" taunt log, post-hand result banner with decision rationale).
-- Secondary CLI surfaces: `play_human.py` (heads-up text REPL) and `main.py`
-  (headless AI-vs-AI benchmarks with confidence intervals).
+- One surface: the web app. The original CLI research tooling (`play_human.py`,
+  `main.py`, `experiments/`) has been archived out of this repo (kept locally,
+  not tracked in git) — see "Evidence on Hand" for what it produced.
 
 ## Capabilities and Constraints
 
@@ -82,9 +81,6 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 - Multiway EV uses a deliberate simplification ("everyone folds" = product of
   individual fold probabilities), not a full game-theoretic solve — an
   acknowledged fun-first tradeoff, not a research claim.
-- The "Simulation Arena" head-to-head benchmark was removed from the web UI
-  (recent commit) and now lives only in `main.py`; the README still references
-  the UI tab and is partially stale on this point.
 - Terminology: "roster", "seat", "the felt", "Table Talk", "Deal Me In", "hero"
   (the human player), "hand meta", "run-out", "side pot".
 
@@ -103,9 +99,11 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 ## Evidence on Hand
 
 - Real, runnable product: full engine, agents, Flask app, test suite, CI badge.
-- Benchmark results with 95% confidence intervals in the README (`main.py`,
-  1500 hands × 5 seeds): Bayesian > EV > Random by expected value.
-- Benchmark plots: `static/plots/*.png`. Screenshots: `static/screenshots/`.
+- Benchmark results with 95% confidence intervals in the README (produced by
+  the now-archived `main.py`, 1500 hands × 5 seeds): Bayesian > EV > Random by
+  expected value — documented as a historical research finding, not a live demo.
+- Screenshots: `static/screenshots/` (predate the Card-Room Ledger redesign —
+  see the pivot log's Round 7 note; still owed a refresh).
 - No customer testimonials, usage numbers, press, or awards — future work must
   not fabricate any.
 

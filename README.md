@@ -38,7 +38,6 @@ Every bot is wired through `agents/personalities.py`, a metadata/taunt registry 
 *   **A live taunt feed**: every action and every hand result can trigger a personality-appropriate line, shown as a floating speech bubble over the bot's seat and logged in the "Table Talk" panel.
 *   **Configurable tables**: 2 to 6 players, pick your opponents from the roster or hit "Deal Me In" to fill empty seats randomly.
 *   **Interactive Web App**: a Flask backend with isolated per-session game state, so multiple people can each play their own match concurrently.
-*   **Simulation Arena**: the original academic head-to-head benchmark (Bayesian vs EV vs Random) is still here as a secondary mode — see below.
 
 ---
 
@@ -73,29 +72,11 @@ Every bot is wired through `agents/personalities.py`, a metadata/taunt registry 
 
 ### Usage
 
-**1. Play the game (Web UI)**
 Run the Flask server:
 ```bash
 python app.py
 ```
 *Navigate to `http://localhost:5000` in your browser.* Pick a table size (2-6), choose your opponents from the roster (or let "Deal Me In" fill the rest randomly), and play. Set `FLASK_SECRET_KEY` in your environment for a stable session key across restarts (otherwise a random one is generated each time the server starts).
-
-**2. Play heads-up against the AI (Terminal)**
-Prefer the command line? `play_human.py` runs the original 2-player engine in a plain-text REPL:
-```bash
-python play_human.py
-```
-
-**3. Run headless benchmarks**
-To run massive AI vs AI multi-seed experiments and print statistical summaries (Mean Chip Gain, Confidence Intervals) for the original 2-player research agents:
-```bash
-python main.py
-```
-Every parameter is configurable via CLI flags:
-```bash
-python main.py --hands 5000 --samples 100 --seeds 1 2 3 --matchups bayesian_vs_ev bayesian_vs_random
-```
-Run `python main.py --help` for the full list. The web UI's "Simulation Arena" tab runs a faster, fixed-seed version of the same thing in the browser.
 
 ### Running Tests
 ```bash
@@ -113,15 +94,15 @@ This is the easiest way to deploy the web UI to a host like Render, Fly.io, or R
 
 ---
 
-## 📊 Simulation Arena: The Research Mode
+## 📊 Research Notes: Bayesian vs EV vs Random
 
-Before this was a playable game, it started as a 2-player research project comparing decision models head-to-head. That comparison is still available — in the web UI's **Simulation Arena** tab, or via `main.py` on the command line — and the underlying result is genuinely interesting enough to keep documented here.
+Before this was a playable game, it started as a 2-player research project comparing decision models head-to-head. That benchmark tooling (`main.py`, `play_human.py`, `experiments/`) has since been moved out of this repo — it isn't part of the shipped playable-game project and isn't tracked in version control here — but the result it produced is genuinely interesting enough to keep documented, and the real bugs it surfaced (see the collapsible section below) are fixed in code that's still very much in this repo (`engine/game_engine.py`, `belief/opponent_stats.py`).
 
 *   **Random Agent**: Selects purely random actions. Used as an absolute baseline.
 *   **EV Agent**: Plays "ABC" poker. It calculates EV but assumes the opponent's hole cards are completely random. Mathematically sound, but heavily exploitable.
 *   **Bayesian Agent**: Dynamically updates its belief about the opponent's hand and runs EV calculations against a narrowed range instead of a uniform one, and adapts its fold/call assumptions to each opponent's actually-observed behavior as a match progresses. It convincingly outperforms the Random baseline, and **beats the EV agent in expected value too** — though its raw win rate against EV stays under 50%, a real, explained property of its strategy (see below).
 
-**Real Simulation Output (`main.py --hands 1500 --samples 50`, 5 seeds):**
+**Real Simulation Output** (from the archived `main.py --hands 1500 --samples 50`, 5 seeds):
 
 | Matchup | Mean chip gain | Win rate | 95% CI |
 |---|---|---|---|
