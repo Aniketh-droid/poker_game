@@ -30,7 +30,7 @@ Every bot is wired through `agents/personalities.py`, a metadata/taunt registry 
 
 ### About "The Data Scientist"
 
-The original plan for this slot was a DataRobot AutoML model trained on self-play data. **That integration is currently on hold**: this environment's network egress policy blocks `app.datarobot.com` (confirmed via a direct connection test, not assumed), so the training/deployment step can't run here. Rather than ship a disabled personality, `agents/data_scientist_agent.py` is a genuine interim bot — an ensemble that averages the EV agent's and Bayesian agent's per-action value estimates — so the seat is fully playable today. The class is structured with a clean swap-in point for a real DataRobot deployment once network access is available; see the docstring in that file.
+`agents/data_scientist_agent.py` is a genuine ensemble bot, not a placeholder: it blends the EV agent's pure pot-odds math with the Bayesian agent's opponent-profiling EV, and the blend weight isn't fixed. Early in a match neither sub-model has real signal on the table, so the two are weighted evenly; as the Bayesian half accumulates real observations of the live opponents (the same per-opponent `OpponentStats` "The Profiler" uses to adapt its own read), the ensemble trusts its opponent-aware estimate more, up to a capped ceiling. See `_bayes_confidence()` in that file.
 
 ### Key Features
 *   **True multiway engine**: side pots, button-relative blinds, and all-in run-outs generalized from a 2-player-only engine, verified with dedicated stress tests (`tests/test_multiway_engine.py`) hammering unequal all-in stacks for zero-sum and no-negative-stack invariants across 2-6 handed tables.
@@ -151,7 +151,7 @@ With both root causes addressed, the Bayesian agent now beats the EV agent in ex
 
 ## 🔮 Future Improvements
 
-*   **Real DataRobot deployment for The Data Scientist**: replace the current EV+Bayesian ensemble with an actual AutoML model trained on self-play data, once network access to DataRobot's API is available in this environment (see above).
+*   **Learned ensemble weighting for The Data Scientist**: replace the fixed confidence floor/ceiling in `_bayes_confidence()` with a weight learned from self-play data instead of hand-tuned constants.
 *   **Dynamic RL Opponent Modeling**: go further than the existing empirical-Bayes fold/call correction — replace the hardcoded bet-sizing and hand-bucket likelihood tables with an online RL agent that learns an opponent's full playstyle over time.
 *   **Deep RL for Multi-Street Planning**: `ev_calculator.py` currently uses a greedy, one-step EV algorithm; PPO-style training could let an agent learn multi-street bluff lines.
 *   **Real human-vs-human tables**: the current build is human-vs-bots; networked human-vs-human seats at the same table is a natural next phase.

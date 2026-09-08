@@ -1,27 +1,16 @@
 """
-Data Scientist agent ("The Data Scientist"): meant to be backed by a DataRobot
-AutoML model trained on self-play data (predict per-action value, pick the best).
+Data Scientist agent ("The Data Scientist"): an ENSEMBLE of the two other
+model-driven agents -- EVAgent's pure pot-odds EV and BayesianAgent's
+opponent-profiling EV -- blending their per-action value estimates and
+picking the best. This is the real, final design for this seat, not a stand-in
+for a heavier model that never shipped.
 
-STATUS: DataRobot's API (app.datarobot.com) is blocked by this environment's
-network egress policy, both from the cloud sandbox and the linked device --
-confirmed via a direct connection test, not assumed. Training/deploying the
-real AutoML model is therefore on hold pending either an org admin allowlisting
-that host, or someone running the training step outside this sandbox (see
-README for the prepared data-gen script and instructions).
-
-Rather than ship a personality that's just disabled, this class is a genuine
-interim bot: an ENSEMBLE of the two existing model-driven agents (EVAgent's
-pure pot-odds EV and BayesianAgent's opponent-profiling EV), averaging their
-per-action EV estimates and picking the best. This is a real, if simpler,
-"data-driven blend" -- not a placeholder that always folds or plays randomly --
-so the personality is fully playable today.
-
-SWAP-IN PATH for when DataRobot access is available: replace the body of
-`_ensemble_ev()` (or act() entirely) with a call through datarobot-predict's
-scoring code / a deployment's predict_proba, feeding it the same feature
-vector the self-play data generator produces (see experiments/ once written).
-Everything else here -- legal-action filtering, action selection, the
-BaseAgent interface -- stays the same, so no caller needs to change.
+The blend weight isn't fixed. Early in a match, neither sub-model has real
+signal on the opponents at this table, so the two are weighted evenly. As the
+Bayesian sub-model accumulates real observations of the live opponents (via
+its own OpponentStats, the same per-opponent tracking BayesianAgent uses to
+adapt its opponent_type -- see _effective_opponent_type), its opponent-aware
+read is trusted more: see _bayes_confidence().
 """
 
 from typing import Any
@@ -31,6 +20,13 @@ from agents.ev_agent import EVAgent
 from agents.bayesian_agent import BayesianAgent
 from engine.action_space import get_legal_actions
 from decision.strategy_mixer import select_action
+
+# ponytail: fixed floor/ceiling on the blend weight rather than a learned
+# function of confidence -- retune these two if the ensemble under/over-trusts
+# the opponent read. Upgrade path: replace with a real trained model (see
+# README's "Future Improvements") once there's self-play data to train on.
+_BAYES_WEIGHT_FLOOR = 0.5
+_BAYES_WEIGHT_CEILING = 0.7
 
 
 class DataScientistAgent(BaseAgent):
@@ -54,26 +50,52 @@ class DataScientistAgent(BaseAgent):
         # Only the Bayesian half of the ensemble actually tracks opponents.
         self._bayes_model.observe(opponent_action, street=street, actor_id=actor_id)
 
+    def _bayes_confidence(self, game_state: Any) -> float:
+        """How much weight the Bayesian sub-model's opponent-read gets this
+        decision, vs. the EV model's blind pot-odds math: _BAYES_WEIGHT_FLOOR
+        with no data on the live opponents, rising to _BAYES_WEIGHT_CEILING as
+        they're observed past BayesianAgent's own adaptation floor
+        (_ADAPT_MIN_HANDS) -- reusing its existing per-opponent stats rather
+        than tracking confidence separately."""
+        stats_by_opp = self._bayes_model._opponent_stats
+        live_opponents = [pid for pid in game_state.live_players() if pid != self.player_id]
+        observed_n = [
+            agg[3]
+            for pid in live_opponents
+            if pid in stats_by_opp
+            for agg in [stats_by_opp[pid].aggregate_rates()]
+            if agg is not None
+        ]
+        if not observed_n:
+            return _BAYES_WEIGHT_FLOOR
+        avg_n = sum(observed_n) / len(observed_n)
+        floor_hands = self._bayes_model._ADAPT_MIN_HANDS
+        span = _BAYES_WEIGHT_CEILING - _BAYES_WEIGHT_FLOOR
+        return _BAYES_WEIGHT_FLOOR + span * min(avg_n / floor_hands, 1.0)
+
     def act(self, game_state: Any) -> str:
         legal = get_legal_actions(game_state, self.player_id)
         if not legal:
             return "FOLD"
 
         # Run each sub-model's own act() first so its internal EV dict gets
-        # populated the normal way, then blend the two dicts by simple average.
-        # (We call act() rather than duplicating EV math here so both models
-        # go through their own already-verified multiway/heads-up branching.)
+        # populated the normal way, then blend the two dicts by confidence-
+        # weighted average. (We call act() rather than duplicating EV math
+        # here so both models go through their own already-verified
+        # multiway/heads-up branching.)
         self._ev_model.act(game_state)
         self._bayes_model.act(game_state)
         ev_a = getattr(self._ev_model, "_last_ev_dict", {}) or {}
         ev_b = getattr(self._bayes_model, "_last_ev_dict", {}) or {}
+        bayes_weight = self._bayes_confidence(game_state)
+        ev_weight = 1.0 - bayes_weight
 
         blended = {}
         for a in legal:
             va = ev_a.get(a)
             vb = ev_b.get(a)
             if va is not None and vb is not None:
-                blended[a] = 0.5 * va + 0.5 * vb
+                blended[a] = ev_weight * va + bayes_weight * vb
             elif va is not None:
                 blended[a] = va
             elif vb is not None:
