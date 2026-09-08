@@ -34,3 +34,10 @@ Thumbs.db
 # Arena tab -- see experiments/visualize.py's os.makedirs(..., exist_ok=True)).
 # Not committing these keeps the repo from accumulating stale run artifacts.
 static/plots/*.png
+
+# Local tool state -- machine-specific config/cache for Claude Code hooks and
+# the "Impeccable" design-linting tool (absolute local paths, review screenshots,
+# consent/cache files). Not project source; safe to `git add .`/`-A` around.
+.claude/
+.impeccable/
+.github/hooks/

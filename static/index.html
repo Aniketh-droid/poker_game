@@ -4,12 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bluff &amp; Bayes</title>
+<meta name="description" content="A private card room where every AI opponent plays a different, inspectable style.">
+<link rel="preload" href="/fonts/libre-caslon-display-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/libre-franklin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
 <nav class="topnav">
-  <div class="brand"><span class="chip-icon"></span> Bluff &amp; Bayes</div>
+  <div class="brand">
+    <svg class="club-mark" viewBox="0 0 32 32" role="img" aria-label="" focusable="false">
+      <path fill="currentColor" d="M16 4c-2.6 3.2-7 5.4-7 9.4 0 2.5 2 4.4 4.4 4.4 1 0 1.9-.3 2.6-.9-.3 2.4-1.4 4.3-3.2 5.6h8.8c-1.8-1.3-2.9-3.2-3.2-5.6.7.6 1.6.9 2.6.9 2.4 0 4.4-1.9 4.4-4.4 0-4-4.4-6.2-7-9.4Z"/>
+    </svg>
+    <span>Bluff <span class="amp">&amp;</span> Bayes</span>
+  </div>
+  <span class="brand-tag">The card room</span>
 </nav>
 
 <div class="page" id="tab-play">
@@ -18,18 +27,18 @@
   <div id="setup-screen">
     <div class="setup-hero">
       <h1>Pull up a seat.</h1>
-      <p>Pick your table size and who's sitting across from you &mdash; every bot plays a genuinely different style.</p>
+      <p>Choose your table and who sits across from you. Every player at this room runs a different, inspectable model &mdash; and after each hand you can read exactly why they did what they did.</p>
     </div>
 
-    <div class="setup-card">
-      <div class="section-label">Table size</div>
+    <div class="setup-card ledger-sheet on-paper">
+      <div class="section-label">Table</div>
       <div class="seat-count-row" id="seat-count-row"></div>
     </div>
 
-    <div class="setup-card">
-      <div class="section-label">Choose your opponents <span id="pick-counter" style="color:var(--text-dim); font-weight:500; text-transform:none; letter-spacing:0;"></span></div>
+    <div class="setup-card ledger-sheet no-hrule on-paper">
+      <div class="section-label">The roster <span class="count-note" id="pick-counter"></span></div>
       <div class="roster-grid" id="roster-grid"></div>
-      <div class="setup-note">Pick exactly as many as your table needs, or leave it to chance &mdash; "Deal Me In" will fill any empty seats randomly.</div>
+      <div class="setup-note">Pick as many as your table seats, or leave it to the room &mdash; &ldquo;Deal Me In&rdquo; fills any empty chairs at random.</div>
     </div>
 
     <div class="setup-actions">
@@ -39,24 +48,56 @@
 
   <!-- Game screen -->
   <div id="game-screen" class="hidden">
-    <div class="table-and-log">
-      <div>
+    <h1 class="sr-only">Your table</h1>
+    <div class="ledger-page ledger-sheet on-paper">
+
+      <div class="ledger-head">
+        <div class="lh-row">
+          <div class="lh-title">The Card Room<span class="lh-sub">Account of play</span></div>
+          <div class="lh-figures">
+            <span class="lh-fig"><span class="lh-k">Your stack</span><b class="st-num" id="lh-stack">$50.00</b></span>
+            <span class="lh-fig"><span class="lh-k">This session</span><b class="st-num" id="lh-session">&mdash;</b></span>
+          </div>
+        </div>
+        <div class="lh-street">
+          <span class="lh-hand" id="hand-meta">Hand 1 &middot; Preflop</span>
+          <span class="street-track" id="street-track" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="table-and-log">
+      <aside class="room-rail" id="room-rail" aria-label="Standings and session account">
+        <p class="rr-meta" id="rr-meta"></p>
+        <h2>The Standings</h2>
+        <div id="standings-list"></div>
+        <div class="rr-session">
+          <h2>The Session</h2>
+          <div id="session-list" aria-live="polite"></div>
+          <div class="rr-balance" id="rr-balance"></div>
+        </div>
+      </aside>
+      <div class="play-col">
         <div class="table-wrap">
           <div class="table-rail"></div>
           <div class="table-felt"></div>
           <div class="table-center">
-            <div class="pot-display">&#127923; Pot: <span id="pot-amount">$0</span></div>
+            <div class="pot-display">
+              <span class="pot-cap">Pot</span>
+              <span class="pot-amount" id="pot-amount">$0</span>
+            </div>
             <div class="board-cards" id="board-cards"></div>
-            <div class="hand-meta" id="hand-meta">Hand 1 &middot; Preflop</div>
           </div>
           <div id="seats-container"></div>
         </div>
 
-        <div class="result-banner hidden" id="result-banner">
-          <div class="r-title" id="result-title"></div>
-          <div class="r-sub" id="result-sub"></div>
-          <button class="btn-ghost" id="btn-rationale-toggle" onclick="togglePanel('rationale-panel')">Why did they play that way?</button>
-          <div class="rationale-panel hidden" id="rationale-panel"></div>
+        <div class="result-banner on-paper hidden" id="result-banner">
+          <div class="r-lead">
+            <div class="r-copy">
+              <div class="r-title" id="result-title"></div>
+              <div class="r-sub" id="result-sub"></div>
+            </div>
+            <div class="r-cards" id="result-cards" aria-hidden="true"></div>
+          </div>
           <button class="btn-primary" onclick="requestNextHand()">Deal Next Hand</button>
         </div>
 
@@ -65,39 +106,40 @@
             <div class="hero-cards-row" id="hero-cards"></div>
             <div class="hero-stats">
               <div><b>You</b></div>
-              <div>Stack: <b id="hero-stack">$0</b></div>
+              <div>Stack <b class="st-num" id="hero-stack">$0</b></div>
             </div>
           </div>
           <div class="action-panel" id="action-panel"></div>
           <div class="waiting-note hidden" id="waiting-note">Waiting on the table&hellip;</div>
         </div>
 
-        <div style="text-align:center; margin-top:14px;">
+        <div class="leave-row">
           <button class="btn-ghost" onclick="leaveTable()">Leave Table</button>
         </div>
       </div>
 
       <div class="log-panel">
-        <h3>Table Talk</h3>
-        <div id="log-list"></div>
+        <h2>The Play<span class="lp-note">this hand</span></h2>
+        <div id="log-list" aria-live="polite"></div>
+        <div class="play-detail" id="play-detail" aria-live="polite"></div>
+      </div>
       </div>
     </div>
   </div>
 
   <!-- Game over overlay -->
   <div class="overlay hidden" id="game-over-overlay">
-    <div class="overlay-card">
-      <div class="oc-emoji" id="go-emoji">&#127942;</div>
+    <div class="overlay-card ledger-sheet on-paper">
+      <div class="oc-emoji" id="go-emoji"></div>
       <h2 id="go-title">Game Over</h2>
       <p id="go-sub"></p>
-      <button class="btn-ghost" id="go-rationale-toggle" onclick="togglePanel('go-rationale-panel')">Why did they play that way? (final hand)</button>
-      <div class="rationale-panel hidden" id="go-rationale-panel"></div>
       <button class="btn-primary" onclick="resetToSetup()">Back to Table Setup</button>
     </div>
   </div>
 
 </div>
 
+<script src="/portraits.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

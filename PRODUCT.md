@@ -91,9 +91,12 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 ## Brand Commitments
 
 - Name: **Bluff & Bayes**. Keep it.
-- Nothing else is fixed. The current dark casino / neon-gradient visual world
-  (deep navy, gold, cyan/pink/purple neon, DM Serif Display + Outfit) is the
-  incumbent but explicitly open to replacement.
+- Visual identity: the **"Card-Room Ledger"** system in `DESIGN.md` — a private
+  card room kept as a hand-inked ledger (baize green, aged paper, oxblood,
+  brass, Caslon display type) — replaced the earlier dark-casino/neon-gradient
+  look and is implemented across `static/index.html`/`app.js`/`styles.css`,
+  including the bot silhouette portraits in `static/portraits.js`. Not fixed
+  forever, but this is the shipped identity going forward, not a draft.
 - Voice in-product is playful and characterful (every bot talks trash); README
   voice is confident, precise, and forthcoming about limitations.
 
@@ -121,6 +124,7 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 
 ## Accessibility & Inclusion
 
-No product-specific standard has been established. General baseline applies;
-current UI leans heavily on color and neon glow for state, which future work
-should not deepen without non-color cues.
+No product-specific standard has been established. General baseline applies.
+The Card-Room Ledger palette (paper/ink/oxblood/brass, see `DESIGN.md`) still
+leans on color to carry state (e.g. gain-green vs. oxblood); future work
+should add non-color cues rather than deepen that reliance.
