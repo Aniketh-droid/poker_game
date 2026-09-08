@@ -86,22 +86,18 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 
 ## Brand Commitments
 
-- Name: **Bluff & Bayes**. Keep it.
+- Name: **Bluff & Bayes**. 
 - Visual identity: the **"Card-Room Ledger"** system in `DESIGN.md` — a private
   card room kept as a hand-inked ledger (baize green, aged paper, oxblood,
   brass, Caslon display type) — replaced the earlier dark-casino/neon-gradient
   look and is implemented across `static/index.html`/`app.js`/`styles.css`,
   including the bot silhouette portraits in `static/portraits.js`. Not fixed
   forever, but this is the shipped identity going forward, not a draft.
-- Voice in-product is playful and characterful (every bot talks trash); README
-  voice is confident, precise, and forthcoming about limitations.
+- Voice in-product is playful and characterful (every bot talks trash).
 
 ## Evidence on Hand
 
 - Real, runnable product: full engine, agents, Flask app, test suite, CI badge.
-- Benchmark results with 95% confidence intervals in the README (produced by
-  the now-archived `main.py`, 1500 hands × 5 seeds): Bayesian > EV > Random by
-  expected value — documented as a historical research finding, not a live demo.
 - Screenshots: `static/screenshots/` (predate the Card-Room Ledger redesign —
   see the pivot log's Round 7 note; still owed a refresh).
 - No customer testimonials, usage numbers, press, or awards — future work must
@@ -124,5 +120,4 @@ the README's "Key Features" and "Core Architecture" sections for the specifics
 
 No product-specific standard has been established. General baseline applies.
 The Card-Room Ledger palette (paper/ink/oxblood/brass, see `DESIGN.md`) still
-leans on color to carry state (e.g. gain-green vs. oxblood); future work
-should add non-color cues rather than deepen that reliance.
+leans on color to carry state (e.g. gain-green vs. oxblood).
