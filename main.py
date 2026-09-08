@@ -4,7 +4,6 @@ Run multi-seed experiments and print statistically meaningful summaries.
 
 import argparse
 import time
-from evaluation.hand_evaluator import compare as compare_hands
 
 DEFAULT_HANDS = 1500
 DEFAULT_SAMPLES = 50
@@ -37,12 +36,6 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-class EvalWrapper:
-    @staticmethod
-    def compare(hand1, hand2):
-        return compare_hands(hand1, hand2)
-
-
 def _entropy_summary(entropy_history):
     if not entropy_history:
         return {"samples": 0, "mean": 0.0, "min": 0.0, "max": 0.0, "last": 0.0}
@@ -59,7 +52,6 @@ def _run_pairing(name, agent1_factory, agent2_factory, hands, seeds, samples):
     from experiments.match_runner import run_match
     from experiments.statistics import report, summarize_runs
 
-    evaluator = EvalWrapper()
     run_means = []
     run_win_rates = []
     run_tie_rates = []
@@ -79,7 +71,6 @@ def _run_pairing(name, agent1_factory, agent2_factory, hands, seeds, samples):
             agent2,
             hands=hands,
             seed=seed,
-            evaluator=evaluator,
             progress_interval=max(1, hands // 5),
         )
         stats = report(result["chip_deltas"])

@@ -5,13 +5,6 @@ from agents.base_agent import BaseAgent
 from agents.random_agent import RandomAgent
 from engine.action_space import get_legal_actions, ALL_IN, CALL, CHECK, FOLD
 from engine.game_engine import play_hand, play_hand_multiway
-from evaluation.hand_evaluator import compare as compare_hands
-
-
-class _Eval:
-    @staticmethod
-    def compare(h1, h2):
-        return compare_hands(h1, h2)
 
 
 class _AllInAgent(BaseAgent):
@@ -52,7 +45,7 @@ class TestMultiwayEngineConservesChips(unittest.TestCase):
             for hand_i in range(15):
                 agents = [RandomAgent(player_id=i, rng=random.Random(hand_i * 10 + i)) for i in range(n)]
                 result = play_hand_multiway(
-                    agents, seed=hand_i, evaluator=_Eval(), button=hand_i % n, return_details=True,
+                    agents, seed=hand_i, button=hand_i % n, return_details=True,
                 )
                 self.assertAlmostEqual(
                     sum(result["chip_delta"]), 0.0, places=6,
@@ -67,7 +60,7 @@ class TestMultiwayEngineConservesChips(unittest.TestCase):
         base_stack = 50.0
         for hand_i in range(20):
             agents = [RandomAgent(player_id=i, rng=random.Random(hand_i + i)) for i in range(n)]
-            result = play_hand_multiway(agents, seed=hand_i, evaluator=_Eval(), button=hand_i % n, return_details=True)
+            result = play_hand_multiway(agents, seed=hand_i, button=hand_i % n, return_details=True)
             for i in range(n):
                 self.assertGreaterEqual(base_stack + result["chip_delta"][i], -1e-6)
 
@@ -83,7 +76,7 @@ class TestMultiwaySidePots(unittest.TestCase):
         for i in range(150):
             agents = [_AllInAgent(0), _AllInAgent(1), _AllInAgent(2)]
             result = play_hand_multiway(
-                agents, seed=9000 + i, evaluator=_Eval(), button=i % 3,
+                agents, seed=9000 + i, button=i % 3,
                 stacks=list(stacks), return_details=True,
             )
             delta = result["chip_delta"]
@@ -106,7 +99,7 @@ class TestMultiwaySidePots(unittest.TestCase):
         for i in range(200):
             agents = [_AllInAgent(0), _AllInAgent(1), _AllInAgent(2)]
             result = play_hand_multiway(
-                agents, seed=1234 + i, evaluator=_Eval(), button=i % 3,
+                agents, seed=1234 + i, button=i % 3,
                 stacks=list(stacks), return_details=True,
             )
             short_stack_delta = result["chip_delta"][0]
@@ -121,7 +114,7 @@ class TestMultiwayFoldsDownToOne(unittest.TestCase):
     def test_hand_ends_when_all_but_one_fold(self):
         n = 4
         agents = [_FoldingAgent(0), _FoldingAgent(1), _FoldingAgent(2), RandomAgent(player_id=3, rng=random.Random(1))]
-        result = play_hand_multiway(agents, seed=42, evaluator=_Eval(), button=0, return_details=True)
+        result = play_hand_multiway(agents, seed=42, button=0, return_details=True)
         self.assertEqual(result["outcome"], "fold")
         self.assertEqual(result["winner_ids"], [3])
         # The lone non-folder should have won the whole pot (net gain > 0).
@@ -148,7 +141,7 @@ class TestAllInRunOutDealsTheFullBoard(unittest.TestCase):
         for i in range(150):
             agents = [_AllInAgent(0), _AllInAgent(1)]
             result = play_hand_multiway(
-                agents, seed=i, evaluator=_Eval(), button=i % 2,
+                agents, seed=i, button=i % 2,
                 stacks=[20.0, 20.0], return_details=True,
             )
             board_lens.append(len(result["board"]))
@@ -168,7 +161,7 @@ class TestAllInRunOutDealsTheFullBoard(unittest.TestCase):
         for i in range(30):
             agents = [_AllInAgent(0), _AllInAgent(1), _AllInAgent(2)]
             result = play_hand_multiway(
-                agents, seed=5000 + i, evaluator=_Eval(), button=i % 3,
+                agents, seed=5000 + i, button=i % 3,
                 stacks=[40.0, 40.0, 40.0], return_details=True,
             )
             self.assertEqual(len(result["board"]), 5, f"hand {i}: board={result['board']}")
@@ -181,7 +174,7 @@ class TestHeadsUpBackwardCompatibility(unittest.TestCase):
         the whole benchmark suite depends on."""
         a0 = RandomAgent(player_id=0, rng=random.Random(1))
         a1 = RandomAgent(player_id=1, rng=random.Random(2))
-        result = play_hand(a0, a1, seed=7, evaluator=_Eval(), return_details=True)
+        result = play_hand(a0, a1, seed=7, return_details=True)
         self.assertAlmostEqual(sum(result["chip_delta"]), 0.0, places=6)
 
 

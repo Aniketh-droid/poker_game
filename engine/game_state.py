@@ -257,6 +257,11 @@ class GameState:
         """
         Resolve the hand and return each player's chip delta (can be a showdown among
         >2 live players, with side pots if contributions differ due to all-ins).
+
+        `evaluator` is a plain callable(hand1, hand2) -> int (positive if hand1 wins,
+        negative if hand2 wins, 0 for a tie) -- evaluation.hand_evaluator.compare's
+        own signature, so callers can pass that function directly instead of
+        wrapping it in an adapter object.
         """
         live = self.live_players()
         n = self.num_players
@@ -316,7 +321,7 @@ class GameState:
                     best = hands[i]
                     winners = [i]
                     continue
-                cmp = evaluator.compare(hands[i], best)
+                cmp = evaluator(hands[i], best)
                 if cmp > 0:
                     best = hands[i]
                     winners = [i]

@@ -12,7 +12,9 @@ Existing codebase, not a greenfield decision: Flask backend (`app.py`) serving a
 single-page frontend built in hand-written HTML/CSS/vanilla JS (`static/`), no
 frontend framework or build step. Python poker engine, belief, and decision
 modules under `engine/`, `belief/`, `decision/`, `evaluation/`, `agents/`.
-Runtime deps: `flask`, `matplotlib`. Deployable via the included `Dockerfile`.
+Runtime deps: `flask` (`matplotlib` is dev/CLI-only, used by `main.py`'s
+plotting and `experiments/visualize.py`, not the Flask app itself). Deployable
+via the included `Dockerfile`.
 
 ## Users
 
@@ -44,11 +46,10 @@ of the underlying work.
 ## Positioning
 
 Every bot decision traces back to an inspectable expected-value calculation —
-no neural-network black boxes. "The Profiler" maintains an *independent* Bayesian
-belief distribution and empirical fold/call statistics **per opponent seat**, so
-it reads a Maniac differently from a Rock and adapts in real time. The engine is
-a from-scratch N-handed implementation with full side-pot math, button-relative
-blinds, and multiway all-in run-outs, verified with dedicated stress tests.
+no neural-network black boxes. The engine and "The Profiler"'s per-opponent
+belief tracking are real, stress-tested engineering, not a demo veneer — see
+the README's "Key Features" and "Core Architecture" sections for the specifics
+(per-seat Bayesian modeling, side-pot math, multiway all-in run-outs).
 
 ## Operating Context
 

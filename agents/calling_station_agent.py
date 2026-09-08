@@ -13,7 +13,7 @@ from typing import Any
 
 from agents.base_agent import BaseAgent
 from engine.action_space import get_legal_actions, FOLD, CHECK, CALL, BET_25, BET_50, BET_100, ALL_IN
-from belief.hand_bucketing import classify_preflop, classify_postflop, PREMIUM, STRONG_MADE, STRONG_DRAW
+from belief.hand_bucketing import classify, PREMIUM, STRONG_MADE, STRONG_DRAW
 
 
 class CallingStationAgent(BaseAgent):
@@ -27,9 +27,7 @@ class CallingStationAgent(BaseAgent):
     def _bucket(self, game_state: Any) -> str:
         hand = game_state.private_cards.get(self.player_id, [])
         board = getattr(game_state, "board", [])
-        if len(board) < 3:
-            return classify_preflop(hand)
-        return classify_postflop(hand, board)
+        return classify(hand, board)
 
     def act(self, game_state: Any) -> str:
         legal = get_legal_actions(game_state, self.player_id)

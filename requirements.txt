@@ -1,3 +1,2 @@
 # Core runtime dependencies for the Bayesian Poker Agent
 flask>=2.3,<4
-matplotlib>=3.7

@@ -14,6 +14,7 @@ from typing import List, Optional, Any, Dict
 from engine.cards import Deck
 from engine.game_state import GameState
 from engine.action_space import BB, get_legal_actions
+from evaluation.hand_evaluator import compare as _default_evaluator
 
 
 def _deal_board_to_current_street(state: GameState, deck: Deck) -> None:
@@ -59,9 +60,13 @@ def play_hand(
     """
     Initialize state, deal cards, post blinds, alternate actions until terminal.
     Return chip delta for each player (e.g. [delta0, delta1]).
-    If forced_private_cards is provided ({0: [Card, Card], 1: [Card, Card]}), 
+    If forced_private_cards is provided ({0: [Card, Card], 1: [Card, Card]}),
     those cards are removed from the deck and dealt to the respective players.
+    `evaluator` is a callable(hand1, hand2) -> int; defaults to
+    evaluation.hand_evaluator.compare if not given.
     """
+    if evaluator is None:
+        evaluator = _default_evaluator
     rng = random.Random(seed)
     deck = Deck(rng=rng).build().shuffle()
     
@@ -132,7 +137,7 @@ def play_hand(
         state.stacks[1] += deltas[1]
         outcome = "fold"
         winner_id = 0 if deltas[0] > 0 else 1
-    elif evaluator is not None and state.street > 3:
+    elif state.street > 3:
         deltas = state.resolve_showdown(evaluator)
         state.stacks[0] += deltas[0]
         state.stacks[1] += deltas[1]
@@ -192,10 +197,15 @@ def play_hand_multiway(
     Returns a details dict (chip_delta, outcome, winner ids, board, per-seat actions)
     -- always the detailed form, since a fun multiplayer table always wants to show
     "who won what" rather than just a chip-delta list.
+
+    `evaluator` is a callable(hand1, hand2) -> int; defaults to
+    evaluation.hand_evaluator.compare if not given.
     """
     n = len(agents)
     if n < 2:
         raise ValueError("play_hand_multiway needs at least 2 agents")
+    if evaluator is None:
+        evaluator = _default_evaluator
 
     rng = random.Random(seed)
     deck = Deck(rng=rng).build().shuffle()

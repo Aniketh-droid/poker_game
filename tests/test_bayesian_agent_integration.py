@@ -4,13 +4,6 @@ from agents.bayesian_agent import BayesianAgent
 from agents.random_agent import RandomAgent
 from engine.game_engine import play_hand
 from engine.action_space import FOLD, CALL, BET_50
-from evaluation.hand_evaluator import compare as compare_hands
-
-
-class _Eval:
-    @staticmethod
-    def compare(h1, h2):
-        return compare_hands(h1, h2)
 
 
 class TestBayesianAgentIntegration(unittest.TestCase):
@@ -26,7 +19,7 @@ class TestBayesianAgentIntegration(unittest.TestCase):
 
         for hand_seed in (101, 202, 303):
             agent.reset()
-            result = play_hand(agent, opponent, seed=hand_seed, evaluator=_Eval(), return_details=True)
+            result = play_hand(agent, opponent, seed=hand_seed, return_details=True)
             self.assertIn(result["outcome"], ("fold", "showdown", "tie"))
             self.assertEqual(len(result["chip_delta"]), 2)
             # Chip deltas must be zero-sum.
@@ -42,7 +35,7 @@ class TestBayesianAgentIntegration(unittest.TestCase):
         def run():
             agent = BayesianAgent(player_id=0, epsilon=0.05, samples=20, seed=7, opponent_type="TIGHT")
             opponent = RandomAgent(player_id=1, rng=__import__("random").Random(3))
-            return play_hand(agent, opponent, seed=555, evaluator=_Eval(), return_details=True)["chip_delta"]
+            return play_hand(agent, opponent, seed=555, return_details=True)["chip_delta"]
 
         self.assertEqual(run(), run())
 

@@ -106,3 +106,12 @@ def classify_postflop(hand: List[Card], board: List[Card]) -> str:
     if flush_draw or straight_draw:
         return STRONG_DRAW if (flush_draw and high >= 10) or (straight_draw and high >= 10) else WEAK_DRAW
     return AIR
+
+
+def classify(hand: List[Card], board: List[Card]) -> str:
+    """Classify a hand into its preflop or postflop bucket, picking the right
+    classifier from board length. The one entry point every agent should call
+    instead of re-deriving `len(board) < 3` itself."""
+    if len(board) < 3:
+        return classify_preflop(hand)
+    return classify_postflop(hand, board)

@@ -22,11 +22,9 @@ def run_match(
     Run a match of N hands. Track chip delta, win rate, bluff count, entropy history.
     Returns dict with chip_deltas, win_rate_agent1, win_rate_agent2, bluff_count_agent1, bluff_count_agent2,
     entropy_history (if agent1 or agent2 is BayesianAgent).
+    `evaluator` (a callable(hand1, hand2) -> int) is passed straight through to
+    play_hand(), which defaults it to evaluation.hand_evaluator.compare if None.
     """
-    if evaluator is None:
-        from evaluation.hand_evaluator import compare as compare_hands
-        evaluator = type("Eval", (), {"compare": staticmethod(compare_hands)})()
-
     rng = random.Random(seed)
     chip_deltas: List[float] = []
     wins_1 = wins_2 = ties = 0

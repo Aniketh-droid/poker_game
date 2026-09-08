@@ -300,9 +300,6 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
     for i, a in enumerate(agents):
         _wrap(a, i)
 
-    from evaluation.hand_evaluator import compare as compare_hands
-    evaluator = type("Eval", (), {"compare": staticmethod(compare_hands)})()
-
     stacks = [STARTING_STACK] * num_players
     button = 0
     hand_number = 0
@@ -326,7 +323,7 @@ def run_match_thread(sid: str, num_players: int, bot_keys: list) -> None:
             hand_ctx["actions"] = []
 
             result = play_hand_multiway(
-                agents, seed=base_seed + hand_number * 7919, evaluator=evaluator,
+                agents, seed=base_seed + hand_number * 7919,
                 button=button % num_players, stacks=list(stacks), return_details=True,
             )
             stacks = [stacks[i] + result["chip_delta"][i] for i in range(num_players)]
@@ -435,7 +432,13 @@ def start_game():
 @app.route('/api/state', methods=['GET'])
 def get_state():
     sid = _get_session_id()
-    return jsonify(games.get(sid, _default_state()))
+    # The background match thread writes several keys of this same dict together
+    # under _state_lock (e.g. assembling "last_result"); reading without the lock
+    # let a poll observe a torn mid-update snapshot (new stacks with a stale
+    # hand_over/last_result). Copy the dict while holding the lock instead.
+    with _state_lock:
+        state = dict(games.get(sid, _default_state()))
+    return jsonify(state)
 
 
 @app.route('/api/action', methods=['POST'])

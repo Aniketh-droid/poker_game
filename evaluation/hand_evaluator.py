@@ -25,23 +25,6 @@ def _suit_count(cards: List[Card]) -> List[Tuple[int, int]]:
     return sorted(((s, c) for s, c in counts.items()), key=lambda x: -x[1])
 
 
-def _is_straight(ranks: List[int]) -> bool:
-    """Check if sorted ranks (high to low) form a straight. Ace low for 5432A."""
-    if len(ranks) < 5:
-        return False
-    ranks = sorted(set(ranks), reverse=True)
-    for i in range(len(ranks) - 4):
-        if ranks[i] - ranks[i + 4] == 4:
-            return True
-    if 14 in ranks:
-        low = [r if r != 14 else 1 for r in ranks]
-        low.sort(reverse=True)
-        for i in range(len(low) - 4):
-            if low[i] - low[i + 4] == 4:
-                return True
-    return False
-
-
 def _straight_high(ranks: List[int]) -> int:
     """High card of best straight, or 0."""
     ranks = sorted(set(ranks), reverse=True)
