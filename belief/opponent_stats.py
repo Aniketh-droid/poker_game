@@ -62,6 +62,19 @@ class OpponentStats:
             return None
         return self._fold_count[street] / n, self._call_count[street] / n, n
 
+    def aggregate_rates(self) -> Optional[Tuple[float, float, float, int]]:
+        """Return (fold_rate, call_rate, bet_rate, n) across every street
+        observed so far this match, or None with no observations yet. Used to
+        classify an opponent's overall archetype once enough hands have been
+        played (see BayesianAgent._effective_opponent_type)."""
+        n = sum(self._total_count)
+        if n == 0:
+            return None
+        fold_rate = sum(self._fold_count) / n
+        call_rate = sum(self._call_count) / n
+        bet_rate = max(0.0, 1.0 - fold_rate - call_rate)
+        return fold_rate, call_rate, bet_rate, n
+
 
 def blend_with_prior(
     prior_fold: float,

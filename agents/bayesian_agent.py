@@ -36,7 +36,7 @@ from belief.hand_bucketing import (
 from belief.bayesian_update import update_belief
 from belief.entropy import compute_entropy
 from belief.opponent_stats import OpponentStats, blend_with_prior
-from belief.opponent_model import get_fold_probability
+from belief.opponent_model import get_fold_probability, TIGHT, LOOSE, AGGRESSIVE
 
 PREFLOP_BUCKETS = [PREMIUM, STRONG, MEDIUM, SPECULATIVE, TRASH]
 POSTFLOP_BUCKETS = [STRONG_MADE, MEDIUM_MADE, WEAK_MADE, STRONG_DRAW, WEAK_DRAW, AIR]
@@ -103,6 +103,17 @@ def _board_aware_transition(preflop_belief: Dict[str, float], board: List[Any], 
 
 
 class BayesianAgent(BaseAgent):
+    # Adaptive opponent_type thresholds: below _ADAPT_MIN_HANDS observations
+    # for an opponent, fall back to the static archetype guess passed at
+    # construction (self.opponent_type) -- same behavior as before this
+    # feature existed. Past that, classify from real aggregate fold/bet rates
+    # instead of trusting the fixed label forever. ponytail: simple
+    # fixed-threshold heuristic, not a learned classifier -- retune these two
+    # numbers if a personality is misreading obvious opponents.
+    _ADAPT_MIN_HANDS = 15
+    _ADAPT_FOLD_THRESHOLD = 0.35
+    _ADAPT_BET_THRESHOLD = 0.35
+
     def __init__(
         self,
         player_id: int = 0,
@@ -134,6 +145,24 @@ class BayesianAgent(BaseAgent):
         self._entropy_history: List[float] = []
         self._hand_actions: List[str] = []
         self._last_street: int = 0
+
+    def _effective_opponent_type(self, actor_id: int) -> str:
+        """This bot's belief starts from the static archetype guess it was
+        built with (self.opponent_type -- e.g. The Profiler defaults TIGHT),
+        then switches to whatever this specific opponent has actually been
+        doing once there's enough signal, reusing the fold/call/bet counts
+        OpponentStats already accumulates across the match -- no new
+        per-opponent state needed."""
+        stats = self._opponent_stats.get(actor_id)
+        agg = stats.aggregate_rates() if stats else None
+        if agg is None or agg[3] < self._ADAPT_MIN_HANDS:
+            return self.opponent_type
+        fold_rate, _call_rate, bet_rate, _n = agg
+        if fold_rate >= self._ADAPT_FOLD_THRESHOLD:
+            return TIGHT
+        if bet_rate >= self._ADAPT_BET_THRESHOLD:
+            return AGGRESSIVE
+        return LOOSE
 
     def _get_or_init(self, actor_id: int) -> Dict[str, float]:
         if actor_id not in self._beliefs:
@@ -172,7 +201,7 @@ class BayesianAgent(BaseAgent):
             belief,
             opponent_action,
             ctx,
-            opponent_type=self.opponent_type,
+            opponent_type=self._effective_opponent_type(key),
         )
         self._opponent_stats[key].record(opponent_action, street)
 

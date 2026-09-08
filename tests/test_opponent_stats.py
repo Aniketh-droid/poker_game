@@ -37,6 +37,22 @@ class TestOpponentStats(unittest.TestCase):
         stats.record(FOLD, street=99)  # should clamp to last street (river=3)
         self.assertEqual(stats.empirical_rates(3)[2], 1)
 
+    def test_aggregate_rates_none_before_any_observation(self):
+        self.assertIsNone(OpponentStats().aggregate_rates())
+
+    def test_aggregate_rates_combine_across_streets(self):
+        stats = OpponentStats()
+        stats.record(FOLD, street=0)
+        stats.record(FOLD, street=1)
+        stats.record(CALL, street=1)
+        stats.record(BET_50, street=2)  # counts toward total, not fold/call
+
+        fold_rate, call_rate, bet_rate, n = stats.aggregate_rates()
+        self.assertEqual(n, 4)
+        self.assertAlmostEqual(fold_rate, 2 / 4)
+        self.assertAlmostEqual(call_rate, 1 / 4)
+        self.assertAlmostEqual(bet_rate, 1 / 4)
+
 
 class TestBlendWithPrior(unittest.TestCase):
     def test_no_observations_returns_prior_unchanged(self):
