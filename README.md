@@ -94,37 +94,13 @@ This is the easiest way to deploy the web UI to a host like Render, Fly.io, or R
 
 ---
 
-## 📊 Research Notes: Bayesian vs EV vs Random
+## 🐞 Two Real Bugs, Found and Fixed
 
-Before this was a playable game, it started as a 2-player research project comparing decision models head-to-head. That benchmark tooling (`main.py`, `play_human.py`, `experiments/`) has since been moved out of this repo — it isn't part of the shipped playable-game project and isn't tracked in version control here — but the result it produced is genuinely interesting enough to keep documented, and the real bugs it surfaced (see the collapsible section below) are fixed in code that's still very much in this repo (`engine/game_engine.py`, `belief/opponent_stats.py`).
+Early development compared the decision-making agents head-to-head and turned up two real issues, both fixed in code that's still central to how "The Profiler" and "The Data Scientist" play today:
 
-*   **Random Agent**: Selects purely random actions. Used as an absolute baseline.
-*   **EV Agent**: Plays "ABC" poker. It calculates EV but assumes the opponent's hole cards are completely random. Mathematically sound, but heavily exploitable.
-*   **Bayesian Agent**: Dynamically updates its belief about the opponent's hand and runs EV calculations against a narrowed range instead of a uniform one, and adapts its fold/call assumptions to each opponent's actually-observed behavior as a match progresses. It convincingly outperforms the Random baseline, and **beats the EV agent in expected value too** — though its raw win rate against EV stays under 50%, a real, explained property of its strategy (see below).
+1.  **`observe()` wasn't receiving the actual street.** `engine/game_engine.py` used to call `agents[1 - pid].observe(action)` with no `street` argument, and `BayesianAgent.observe(self, opponent_action, street=0)` silently defaulted to street `0` (preflop) for every call — so every postflop belief update was computed against the *preflop* row of the likelihood tables in `opponent_model.py`, regardless of what street the action actually happened on. **Fixed**: the engine now captures the street *before* `apply_action()` (since a check/call closing the street can advance it as a side effect) and passes it through, with a regression test (`tests/test_observe_street_threading.py`) asserting the engine reports real, non-decreasing streets across a hand instead of always `0`.
 
-**Real Simulation Output** (from the archived `main.py --hands 1500 --samples 50`, 5 seeds):
-
-| Matchup | Mean chip gain | Win rate | 95% CI |
-|---|---|---|---|
-| Bayesian vs EV | **+0.3297** | 44.43% | [0.0551, 0.6042] |
-| Bayesian vs Random | +4.9238 | 46.85% | [4.3615, 5.4861] |
-| EV vs Random | +5.6547 | 62.47% | [4.8516, 6.4577] |
-
-So the actual ranking by expected value is **Bayesian > EV > Random**: the Bayesian agent's mean chip gain against the EV agent is positive with a 95% CI entirely above zero, and all 5 individual seeds were positive too — a consistent, reproducible result. Its win rate against EV (44.43%) is still below 50%: it wins fewer hands than it loses, but wins bigger ones, coming out ahead on chips overall — a legitimate value-betting/bluff-catching tradeoff once its opponent model is calibrated correctly.
-
-<details>
-<summary><b>⚠️ Known Limitations &amp; how the Bayesian-vs-EV gap was diagnosed and fixed (click to expand)</b></summary>
-
-The Bayesian agent losing to the simpler EV agent was diagnosed down to two compounding root causes in the code. Both are now fixed and verified at full benchmark scale (see the table above):
-
-1.  **A real bug, now fixed: `observe()` wasn't receiving the actual street.** `engine/game_engine.py` used to call `agents[1 - pid].observe(action)` with no `street` argument, and `BayesianAgent.observe(self, opponent_action, street=0)` silently defaulted to street `0` (preflop) for every call — so every postflop belief update was computed against the *preflop* row of the likelihood tables in `opponent_model.py`, regardless of what street the action actually happened on. **Fixed**: the engine now captures the street *before* `apply_action()` (since a check/call closing the street can advance it as a side effect) and passes it through, with a regression test (`tests/test_observe_street_threading.py`) asserting the engine reports real, non-decreasing streets across a hand instead of always `0`. On its own this narrowed the gap without closing it, because item 2 below was still uncorrected.
-2.  **A design limitation, now mitigated: the opponent archetype was a static, unlearned label.** `main.py` hard-codes `opponent_type="TIGHT"` when the Bayesian agent faces the EV agent, but `EVAgent` doesn't play like any hard-coded archetype — it best-responds to real Monte Carlo equity with no concept of hand buckets. Measuring `EVAgent`'s *actual* fold frequency by hand bucket against the table the Bayesian agent assumed showed large, systematic gaps. Sweeping the opponent archetype (`TIGHT` / `LOOSE` / `AGGRESSIVE`) confirmed this wasn't a "wrong preset" problem: none of the three static labels let the Bayesian agent beat the EV agent.
-
-    **Fix**: `belief/opponent_stats.py` adds an `OpponentStats` tracker that records the opponent's real fold vs. call/check responses per street across an entire match. `decision/ev_calculator.compute_ev()`'s bet-EV branch now blends the static archetype-table prior with these empirical per-street rates via empirical-Bayes shrinkage (`blend_with_prior()`, prior worth 10 pseudo-observations): with zero real observations it's numerically identical to the old static-only behavior, and as a match accumulates hands, the estimate converges toward the opponent's true frequency.
-
-    This is a real behavioral tradeoff, not a free lunch: `RandomAgent` has no stable fold/call tendency for the tracker to learn, so the same correction adds variance rather than signal there — Bayesian vs Random's mean chip gain is statistically unchanged but its win rate dropped from ~55% to ~47%, the same expected value delivered through fewer, larger wins.
-
-With both root causes addressed, the Bayesian agent now beats the EV agent in expectation as well as beating Random. The remaining honest caveat is scope: this fix corrects one scalar pair (fold/call rate) per street via shrinkage — it doesn't touch bet-sizing frequency, the hand-bucket likelihood tables themselves, or give the agent a genuinely *learned* representation of its opponent.
+2.  **The opponent archetype was a static, unlearned label.** Each bot's `opponent_type` (TIGHT/LOOSE/AGGRESSIVE) was fixed at construction and never adapted, no matter how much real behavior the agent observed. **Fix**: `belief/opponent_stats.py` adds an `OpponentStats` tracker that records the opponent's real fold vs. call/check responses per street across a match. `decision/ev_calculator.compute_ev()`'s bet-EV branch blends the static archetype-table prior with these empirical per-street rates via empirical-Bayes shrinkage (`blend_with_prior()`, prior worth 10 pseudo-observations): with zero real observations it's numerically identical to the old static-only behavior, and as more hands are observed the estimate converges toward the opponent's true frequency. The honest caveat on scope: this corrects one scalar pair (fold/call rate) per street via shrinkage — it doesn't touch bet-sizing frequency, the hand-bucket likelihood tables themselves, or give the agent a genuinely *learned* representation of its opponent.
 
 **Multiway simplification, disclosed rather than hidden**: at a 3-6 handed table, `compute_ev_multiway()` computes "does everyone fold" as the *product* of each live opponent's individual fold probability — a deliberate simplification, not a full N-player game-theoretic solve (a real multiway solve needs CFR-style search over every opponent's response). It captures the right qualitative shape (more live opponents → harder to bluff everyone off a hand) without needing a full solver in a real-time bot's hot path — the right tradeoff for a fun-first game, not a research claim of multiway optimality.
 
